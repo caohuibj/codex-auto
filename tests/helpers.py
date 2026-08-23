@@ -66,6 +66,14 @@ def make_config(max_fix_cycles: int = 2) -> AppConfig:
     )
 
 
+def make_app_config(max_fix_cycles: int = 2) -> AppConfig:
+    raw = make_config(max_fix_cycles).model_dump(mode="json")
+    raw["providers"] = {"chatgpt_app": {"type": "chatgpt_app", "api_key_env": None, "store": False}}
+    for route in raw["routing"].values():
+        route["provider"] = "chatgpt_app"
+    return AppConfig.model_validate(raw)
+
+
 def make_request() -> TaskRequest:
     return TaskRequest(
         task_id="TASK-001",
@@ -260,7 +268,7 @@ class MockGitHubAdapter:
             base_branch="main",
             base_sha=BASE_SHA,
             head_branch=self.branch or "codex-auto/task-001",
-            head_sha=HEAD_ONE if self.commit_count == 1 else HEAD_TWO,
+            head_sha=HEAD_ONE if self.commit_count <= 1 else HEAD_TWO,
             diff="diff --git a/src/feature.py b/src/feature.py\n+NEW = 2\n",
             checks=[CheckEvidence(name="ci", status="completed", conclusion="success")],
             local_verification=verification,

@@ -5,19 +5,22 @@ build-backend = "hatchling.build"
 [project]
 name = "codex-auto"
 version = "0.2.0"
-description = "Deterministic Sol/Luna orchestration over the OpenAI Responses API and GitHub evidence"
+description = "Deterministic Sol/Luna orchestration for ChatGPT App or OpenAI Responses API"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = [
-  "openai>=1.68,<3",
   "pydantic>=2.10,<3",
   "PyYAML>=6.0,<7",
 ]
 
 [project.optional-dependencies]
+api = [
+  "openai>=1.68,<3",
+]
 dev = [
   "mypy>=1.14,<2",
+  "openai>=1.68,<3",
   "pytest>=8.3,<10",
   "pytest-cov>=6,<8",
   "ruff>=0.9,<1",

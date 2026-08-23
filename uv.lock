@@ -42,14 +42,17 @@ name = "codex-auto"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [
-    { name = "openai" },
     { name = "pydantic" },
     { name = "pyyaml" },
 ]
 
 [package.optional-dependencies]
+api = [
+    { name = "openai" },
+]
 dev = [
     { name = "mypy" },
+    { name = "openai" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
@@ -59,7 +62,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.14,<2" },
-    { name = "openai", specifier = ">=1.68,<3" },
+    { name = "openai", marker = "extra == 'api'", specifier = ">=1.68,<3" },
+    { name = "openai", marker = "extra == 'dev'", specifier = ">=1.68,<3" },
     { name = "pydantic", specifier = ">=2.10,<3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3,<10" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6,<8" },
@@ -67,7 +71,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.9,<1" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0,<7" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["api", "dev"]
 
 [[package]]
 name = "colorama"

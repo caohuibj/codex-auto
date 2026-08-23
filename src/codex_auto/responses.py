@@ -32,6 +32,8 @@ class OpenAIResponsesClient:
     """Thin SDK adapter; the orchestration core depends only on the ResponsesClient protocol."""
 
     def __init__(self, provider_name: str, config: ProviderConfig) -> None:
+        if config.type != "openai" or config.api_key_env is None:
+            raise ResponsesClientError("OpenAIResponsesClient requires an openai provider")
         api_key = os.getenv(config.api_key_env)
         if not api_key:
             raise ResponsesClientError(

@@ -39,3 +39,13 @@ def test_invalid_cost_rate_is_rejected():
 
     with pytest.raises(ValidationError, match="decimal string"):
         AppConfig.model_validate(raw)
+
+
+def test_chatgpt_app_provider_rejects_api_key_configuration():
+    raw = make_config().model_dump(mode="json")
+    raw["providers"] = {"app": {"type": "chatgpt_app", "api_key_env": "OPENAI_API_KEY"}}
+    for route in raw["routing"].values():
+        route["provider"] = "app"
+
+    with pytest.raises(ValidationError, match="must not configure an API key"):
+        AppConfig.model_validate(raw)

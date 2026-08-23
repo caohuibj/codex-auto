@@ -5,31 +5,53 @@ description: Use for implementation, bug fixes, or refactors in this repository 
 
 # Project-local codex-auto workflow
 
-Operate only in `__REPOSITORY__`. Use the repository-local runtime and configuration; never install
-or modify a user-level or system-level codex-auto installation.
+Operate only in `__REPOSITORY__`. Read `.codex-auto/project.yml` and
+`.codex-auto/orchestrator.yml` before acting. Never copy ChatGPT OAuth tokens, request an OpenAI API
+key in `chatgpt-app` mode, install a global runtime, or merge a pull request.
 
-When this skill applies:
+## ChatGPT App mode (default)
 
-1. Read `.codex-auto/project.yml`, `.codex-auto/orchestrator.yml`, the current Git state, and the
-   relevant repository files.
-2. Convert the request into one bounded TaskRequest YAML file under `.codex-auto/tasks/`. Include a
-   stable task ID, exact in-scope and out-of-scope boundaries, relevant context paths, constraints,
-   and verification names that exist in `.codex-auto/orchestrator.yml`.
-3. Validate the request before running:
+The current ChatGPT desktop App task is the orchestration runtime. Planning and review stay in the
+primary Sol task. Implementation and fixes must be delegated through the App's native subagent tool
+to one Luna agent using the exact configured model and effort. Do not invoke Codex CLI, Responses
+API, or an SDK as a model backend. The project-local `codex-auto` executable below is only a
+deterministic validator/state recorder; it performs no model call.
+
+Before starting, confirm that the primary task model matches the configured planning/review route
+and that native delegation can create the configured Luna implementation/fix route. If either exact
+route is unavailable, stop with a precise blocker; do not silently substitute a model or implement
+inside the Sol task.
+
+1. Convert the request into one bounded TaskRequest YAML under `.codex-auto/tasks/<task-id>.yml`.
+   Include exact scope, exclusions, context paths, constraints, and configured verification names.
+2. Start the durable session and write a packet:
 
    ```text
-   ./.codex-auto/bin/codex-auto validate --config .codex-auto/orchestrator.yml --task <task-file>
+   ./.codex-auto/bin/codex-auto app-start --config .codex-auto/orchestrator.yml --task <task-file> --repo-path . --session .codex-auto/results/<task-id>/session.json --packet .codex-auto/results/<task-id>/packet.json
    ```
 
-4. For an authorized implementation request, run the project-local orchestrator:
+3. As Sol, inspect the packet and repository, write a PlanProposal YAML matching
+   `references/app-workflow.md`, then validate it with `app-accept-plan`.
+4. Run `app-begin-implementation`. Delegate the validated contract and feature branch to exactly one
+   Luna subagent. Luna may edit only contract scope, run named checks, commit, push, and open/update
+   the PR. Wait for it to finish; do not implement in the Sol task.
+5. Record the PR with `app-record-pr --pr-number <n>`, then run `app-begin-review`. As Sol, review
+   the actual packet diff, checks, and contract; write a ReviewResult YAML and submit it with
+   `app-submit-review`.
+6. On `CHANGES_REQUESTED`, run `app-begin-fix`. If it returns `FIXING`, delegate only the blocking
+   findings to Luna, then run `app-record-fix --pr-number <n>` and repeat Sol review. Never exceed
+   `max_fix_cycles`; a `BLOCKED` result is terminal.
+7. On `MERGE_READY`, report the PR and evidence, then stop for human merge.
 
-   ```text
-   ./.codex-auto/bin/codex-auto run --config .codex-auto/orchestrator.yml --task <task-file> --repo-path .
-   ```
+Pass `--packet .codex-auto/results/<task-id>/packet.json` on any checkpoint when a refreshed handoff
+packet is needed. Treat a failed checkpoint, contract, evidence gate, CI check, state transition, or
+human merge gate as authoritative.
 
-5. Report the final state, PR URL, verification evidence, fix-cycle count, token/cost accounting,
-   and any genuine limitation. Never merge the PR.
+Read `references/app-workflow.md` for every checkpoint command and the exact PlanProposal and
+ReviewResult shapes before starting the first App-native workflow.
 
-Stop with a precise blocker if the local runtime, API key, GitHub authentication, clean worktree, or
-required configuration is missing. Do not bypass a failed contract, patch, evidence, CI, or human
-merge gate.
+## Responses API mode (explicit opt-in)
+
+Only when `.codex-auto/project.yml` says `execution_mode: responses-api`, validate the task and use
+the `run` command. That mode requires its configured API credential and is billed separately from
+ChatGPT. Never infer API access from a ChatGPT subscription.

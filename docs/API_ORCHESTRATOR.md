@@ -81,7 +81,7 @@ Contract. Each command is an argument vector and is executed without a shell.
 ## CLI
 
 ```bash
-uv sync --extra dev
+uv sync --extra api --extra dev
 uv run codex-auto init-project --help
 uv run codex-auto validate \
   --config config/orchestrator.example.yml \

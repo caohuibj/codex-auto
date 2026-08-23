@@ -34,7 +34,20 @@ class JsonlAuditLog:
         self.path = Path(path)
         self.task_id = task_id
         self.max_payload_chars = max_payload_chars
-        self._sequence = 0
+        self._sequence = self._last_sequence()
+
+    def _last_sequence(self) -> int:
+        if not self.path.exists():
+            return 0
+        last = 0
+        for line in self.path.read_text(encoding="utf-8").splitlines():
+            try:
+                value = json.loads(line)
+                if value.get("task_id") == self.task_id:
+                    last = max(last, int(value.get("sequence", 0)))
+            except (ValueError, TypeError, json.JSONDecodeError):
+                continue
+        return last
 
     def append(self, event_type: str, state: TaskState, payload: dict[str, Any]) -> AuditEvent:
         self._sequence += 1

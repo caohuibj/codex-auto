@@ -200,6 +200,25 @@ class OrchestrationResult(StrictModel):
     blocked_reason: str | None = None
 
 
+class AppSession(StrictModel):
+    """Durable state for a workflow whose model runtime is the ChatGPT desktop app."""
+
+    task_id: str
+    state: TaskState = TaskState.REQUESTED
+    request: TaskRequest
+    repository: RepositorySnapshot
+    contract: TaskContract | None = None
+    pull_request_evidence: PullRequestEvidence | None = None
+    review: ReviewResult | None = None
+    feature_branch: str | None = None
+    fix_cycles: int = 0
+    blocked_reason: str | None = None
+    accounting_note: str = (
+        "ChatGPT App usage is charged to the signed-in plan allowance; exact per-phase tokens "
+        "and cost are not exposed to this repository-local workflow."
+    )
+
+
 class AuditEvent(StrictModel):
     sequence: int = Field(ge=1)
     timestamp: datetime

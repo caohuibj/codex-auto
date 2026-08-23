@@ -13,11 +13,19 @@ from codex_auto.models import StrictModel
 
 
 class ProviderConfig(StrictModel):
-    type: Literal["openai"] = "openai"
-    api_key_env: str = "OPENAI_API_KEY"
+    type: Literal["openai", "chatgpt_app"] = "openai"
+    api_key_env: str | None = "OPENAI_API_KEY"
     base_url: str | None = None
     timeout_seconds: float = Field(default=120, gt=0, le=1800)
     store: bool = False
+
+    @model_validator(mode="after")
+    def api_key_matches_provider(self) -> ProviderConfig:
+        if self.type == "openai" and not self.api_key_env:
+            raise ValueError("openai provider requires api_key_env")
+        if self.type == "chatgpt_app" and self.api_key_env is not None:
+            raise ValueError("chatgpt_app provider must not configure an API key")
+        return self
 
 
 class ModelRoute(StrictModel):

@@ -101,6 +101,7 @@ def initialize_project(
     verification_specs: list[str],
     required_ci_checks: list[str],
     max_fix_cycles: int,
+    execution_mode: str = "chatgpt-app",
     force: bool = False,
 ) -> list[Path]:
     root = Path(repo_path).resolve()
@@ -108,37 +109,41 @@ def initialize_project(
         raise ProjectInitError(f"target must be a git repository or worktree: {root}")
     commands = parse_verification_specs(verification_specs)
 
+    if execution_mode not in {"chatgpt-app", "responses-api"}:
+        raise ProjectInitError("execution_mode must be chatgpt-app or responses-api")
+    app_native = execution_mode == "chatgpt-app"
+    provider_name = "chatgpt_app" if app_native else "openai"
     config = AppConfig.model_validate(
         {
             "providers": {
-                "openai": {
-                    "type": "openai",
-                    "api_key_env": "OPENAI_API_KEY",
+                provider_name: {
+                    "type": provider_name,
+                    "api_key_env": None if app_native else "OPENAI_API_KEY",
                     "timeout_seconds": 180,
                     "store": False,
                 }
             },
             "routing": {
                 "planning": {
-                    "provider": "openai",
+                    "provider": provider_name,
                     "model": sol_model,
                     "reasoning_effort": "high",
                     "max_output_tokens": 8000,
                 },
                 "implementation": {
-                    "provider": "openai",
+                    "provider": provider_name,
                     "model": luna_model,
                     "reasoning_effort": "max",
                     "max_output_tokens": 20000,
                 },
                 "review": {
-                    "provider": "openai",
+                    "provider": provider_name,
                     "model": sol_model,
                     "reasoning_effort": "high",
                     "max_output_tokens": 10000,
                 },
                 "fix": {
-                    "provider": "openai",
+                    "provider": provider_name,
                     "model": luna_model,
                     "reasoning_effort": "max",
                     "max_output_tokens": 12000,
@@ -166,6 +171,7 @@ def initialize_project(
             "production_branch": production_branch,
         },
         "workflow": {
+            "execution_mode": execution_mode,
             "human_merge_required": True,
             "feature_branch_pattern": "codex-auto/*",
             "task_contract_required": True,
@@ -192,7 +198,15 @@ def initialize_project(
             yaml.safe_dump(config.model_dump(mode="json"), sort_keys=False, allow_unicode=True),
             False,
         ),
-        root / ".codex-auto/.env.example": ("OPENAI_API_KEY=replace_me\n", False),
+        root / ".codex-auto/.env.example": (
+            (
+                "# ChatGPT App mode uses the signed-in ChatGPT subscription.\n"
+                "# No OpenAI API key or copied ChatGPT token is required.\n"
+            )
+            if app_native
+            else "OPENAI_API_KEY=replace_me\n",
+            False,
+        ),
         root / ".codex-auto/bin/codex-auto": (_LAUNCHER, True),
         root / ".agents/skills/codex-auto/SKILL.md": (
             _render_template("codex-auto/SKILL.md", repository),
@@ -200,6 +214,10 @@ def initialize_project(
         ),
         root / ".agents/skills/codex-auto/agents/openai.yaml": (
             _render_template("codex-auto/agents/openai.yaml", repository),
+            False,
+        ),
+        root / ".agents/skills/codex-auto/references/app-workflow.md": (
+            _render_template("codex-auto/references/app-workflow.md", repository),
             False,
         ),
     }

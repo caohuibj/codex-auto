@@ -5,7 +5,7 @@
 每个开发项目拥有独立的 codex-auto：
 
 - 独立 Sol/Luna 模型路由、验证命令、CI 门禁和修复次数；
-- 独立 Python runtime 和 OpenAI API key；
+- 独立 Python 校验 runtime；默认使用已登录的 ChatGPT App/Plus，不需要 OpenAI API key；
 - 只在该项目中被 ChatGPT 桌面版/Codex 自动发现；
 - 不写入 `~/.codex`、`~/.agents`、系统 Python 或全局 plugin 目录。
 
@@ -23,7 +23,7 @@ target-repository/
     ├── bin/codex-auto
     ├── project.yml
     ├── orchestrator.yml
-    ├── .env.example
+    ├── .env.example             # App 模式说明；不含 secret
     └── runtime/                 # ignored, project-local virtual environment
 ```
 
@@ -41,7 +41,7 @@ folder 自动发现 `.agents/skills`、`AGENTS.md` 和项目配置；secondary f
 
 - 目标目录是 Git repository/worktree，且已配置正确的 GitHub remote；
 - 已安装 `uv`、`git` 和 `gh`，并完成 `gh auth login`；
-- 有可调用所配置模型的 OpenAI API key；
+- ChatGPT 桌面 App 已使用包含 Codex 的 ChatGPT 账户登录；
 - Python 3.11 或更高版本。
 
 ## 安装：完全隔离在目标项目
@@ -91,7 +91,8 @@ Contract allowlist，模型不能自行增加任意命令。
   --verification "typecheck=uv run mypy" \
   --verification "unit=uv run pytest -q" \
   --required-ci-check quality \
-  --max-fix-cycles 2
+  --max-fix-cycles 2 \
+  --execution-mode chatgpt-app
 ```
 
 Node 项目可以改为：
@@ -117,21 +118,14 @@ git commit -m "chore: install project-local codex-auto"
 
 `runtime/`、task、audit 和 `.env` 已被忽略，不会进入这个 commit。
 
-### 5. 设置本项目 API key
+### 5. 确认 App 认证边界
 
-```bash
-cp .codex-auto/.env.example .codex-auto/.env
-chmod 600 .codex-auto/.env
-```
+默认 `chatgpt-app` 模式直接使用桌面 App 中已登录账户的 Codex allowance，不需要创建 `.env`，
+也不要从 App 抓取、复制或提交 OAuth token。`.env.example` 只记录这一边界。
 
-编辑 `.codex-auto/.env`：
-
-```text
-OPENAI_API_KEY=your_project_key
-```
-
-`.codex-auto/.env` 和 runtime 会自动加入目标仓库 `.gitignore`。项目 launcher 只在运行时读取这个
-文件，不会修改 shell profile 或用户级环境变量。
+如果将来明确选择独立 API 计费，重新用 `--execution-mode responses-api --force` 初始化，再创建
+`.codex-auto/.env` 设置 `OPENAI_API_KEY`，并把 runtime 安装目标改为 `codex-auto[api]`。这不是
+Plus 权益，API 会单独计费。
 
 ### 6. 验证安装
 
@@ -187,24 +181,30 @@ review-only、解释性问题和明确要求 direct manual editing 的任务不�
 实际修改本地代码、运行 Git 和创建 PR 时仍应使用这个 local project 中的 Codex task；在普通
 ChatGPT Chat/Work 中选择 skill 本身不会额外授予本地文件或 terminal 权限。
 
-skill 会创建项目内 TaskRequest、先执行 `validate`，然后调用：
+skill 会创建项目内 TaskRequest，并通过 `app-*` checkpoint 驱动持久状态。模型工作仍由当前 App
+中的 Sol 主任务和 App 原生 Luna 子代理完成；checkpoint 只做校验、GitHub 取证和审计，不调用 CLI
+模型客户端、SDK 或 Responses API。典型开头为：
 
 ```bash
-./.codex-auto/bin/codex-auto run \
+./.codex-auto/bin/codex-auto app-start \
   --config .codex-auto/orchestrator.yml \
-  --task <generated-task-file> \
-  --repo-path .
+  --task <generated-task-file> --repo-path . \
+  --session .codex-auto/results/<task-id>/session.json \
+  --packet .codex-auto/results/<task-id>/packet.json
 ```
 
 最终停在 GitHub PR 的 human merge gate，不会 merge。
+
+完整阶段和 PlanProposal/ReviewResult 格式见
+[`CHATGPT_APP_ORCHESTRATION.md`](CHATGPT_APP_ORCHESTRATION.md)。
 
 ## 多个 Project 如何保持互不影响
 
 为每个仓库分别执行安装。每个 project 可以使用不同配置：
 
 ```text
-project-a/.codex-auto/orchestrator.yml  -> Sol High + Luna Max, 3 fix cycles
-project-b/.codex-auto/orchestrator.yml  -> different model IDs, 1 fix cycle
+project-a/.codex-auto/orchestrator.yml  -> App Sol High + Luna Max, 3 fix cycles
+project-b/.codex-auto/orchestrator.yml  -> different App model IDs, 1 fix cycle
 ```
 
 repo-scoped skill 只从当前/父级仓库的 `.agents/skills` 被发现。不要把它安装到
@@ -230,4 +230,6 @@ uv pip install --upgrade \
 - 普通、非 local 的 ChatGPT project 不能运行本地 Git/GitHub adapter；应使用带 primary folder 的
   local project/Codex task。
 - 初始化不会替你选择正确的验证命令或 CI check name；这些必须与目标仓库真实命令一致。
-- API 调用、branch、push 和 PR 创建仍受项目 credentials、sandbox 和网络权限约束。
+- App 模式的 branch、push 和 PR 创建仍受项目 credentials、sandbox 和网络权限约束。
+- App 没有向 repo-local helper 暴露逐阶段精确 token/美元数据；实际 allowance/credits 在 ChatGPT
+  Usage 页面查看，audit 会明确标记 accounting unavailable。

@@ -65,3 +65,40 @@ def test_init_project_reports_invalid_policy_without_traceback(tmp_path, capsys)
     error = capsys.readouterr().err
     assert '"initialized": false' in error
     assert "max_fix_cycles" in error
+
+
+def test_api_run_refuses_to_reuse_chatgpt_app_credentials(tmp_path, capsys):
+    root = tmp_path / "consumer"
+    root.mkdir()
+    (root / ".git").mkdir()
+    assert (
+        main(
+            [
+                "init-project",
+                "--repo-path",
+                str(root),
+                "--repository",
+                "owner/example",
+                "--verification",
+                "unit=python -m pytest -q",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    task = Path(__file__).parents[1] / "examples/task.example.yml"
+
+    exit_code = main(
+        [
+            "run",
+            "--config",
+            str(root / ".codex-auto/orchestrator.yml"),
+            "--task",
+            str(task),
+            "--repo-path",
+            str(root),
+        ]
+    )
+
+    assert exit_code == 2
+    assert "does not copy or reuse ChatGPT credentials" in capsys.readouterr().err

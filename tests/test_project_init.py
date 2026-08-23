@@ -51,7 +51,7 @@ def test_initialize_project_creates_repo_scoped_runtime_and_skill(tmp_path):
     created = init(root)
     config = load_config(root / ".codex-auto/orchestrator.yml")
 
-    assert len(created) == 6
+    assert len(created) == 7
     assert config.github.repository == "owner/example"
     assert config.github.base_branch == "dev"
     assert config.github.verification_commands["unit"] == ["uv", "run", "pytest", "-q"]
@@ -59,17 +59,45 @@ def test_initialize_project_creates_repo_scoped_runtime_and_skill(tmp_path):
     assert ".agents/skills/**" in config.github.forbidden_paths
     assert config.routing.planning.model == "sol-model"
     assert config.routing.implementation.model == "luna-model"
+    assert config.providers["chatgpt_app"].type == "chatgpt_app"
+    assert config.providers["chatgpt_app"].api_key_env is None
 
     skill = (root / ".agents/skills/codex-auto/SKILL.md").read_text(encoding="utf-8")
     assert "name: codex-auto" in skill
     assert "owner/example" in skill
-    assert ".codex-auto/bin/codex-auto run" in skill
+    assert ".codex-auto/bin/codex-auto app-start" in skill
+    assert "Do not invoke Codex CLI" in skill
+    assert (root / ".agents/skills/codex-auto/references/app-workflow.md").exists()
     assert (root / ".codex-auto/bin/codex-auto").stat().st_mode & 0o111
 
     gitignore = (root / ".gitignore").read_text(encoding="utf-8")
     assert ".codex-auto/runtime/" in gitignore
     assert ".codex-auto/.env" in gitignore
     assert "$HOME" not in "\n".join(str(path) for path in created)
+    assert "No OpenAI API key" in (root / ".codex-auto/.env.example").read_text(encoding="utf-8")
+
+
+def test_initialize_project_can_explicitly_select_responses_api(tmp_path):
+    root = make_repo(tmp_path)
+
+    initialize_project(
+        repo_path=root,
+        repository="owner/example",
+        base_branch="main",
+        production_branch="main",
+        sol_model="sol-model",
+        luna_model="luna-model",
+        verification_specs=["unit=python -m pytest -q"],
+        required_ci_checks=[],
+        max_fix_cycles=1,
+        execution_mode="responses-api",
+    )
+
+    config = load_config(root / ".codex-auto/orchestrator.yml")
+    assert config.providers["openai"].api_key_env == "OPENAI_API_KEY"
+    assert (root / ".codex-auto/.env.example").read_text(encoding="utf-8") == (
+        "OPENAI_API_KEY=replace_me\n"
+    )
 
 
 def test_initialize_project_is_idempotent_and_does_not_duplicate_gitignore(tmp_path):

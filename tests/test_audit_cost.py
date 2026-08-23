@@ -41,3 +41,12 @@ def test_cost_ledger_separates_cached_input_tokens():
 
     assert recorded.estimated_cost_usd == "0.975"
     assert ledger.total_usd == "0.975"
+
+
+def test_audit_sequence_continues_across_process_like_instances(tmp_path):
+    path = tmp_path / "events.jsonl"
+    JsonlAuditLog(path, "TASK-001").append("first", TaskState.REQUESTED, {})
+    JsonlAuditLog(path, "TASK-001").append("second", TaskState.PLANNING, {})
+
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert [row["sequence"] for row in rows] == [1, 2]
