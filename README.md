@@ -29,6 +29,23 @@ Sol High — Independent Reviewer
 
 The model names are defaults, not hard dependencies. The protocol is based on role separation: expensive judgment for planning/review, bounded execution for implementation, and repository evidence for coordination.
 
+## Executable API Orchestrator
+
+The repository now includes a minimal Python service that executes this protocol with configurable
+Sol/Luna routes over the OpenAI Responses API. It validates a model-generated Task Contract, applies
+bounded implementation/fix patches on a feature branch, opens a GitHub PR, collects actual diff/CI
+evidence, independently reviews it, and stops at a human merge gate.
+
+```bash
+uv sync --extra dev
+uv run codex-auto validate \
+  --config config/orchestrator.example.yml \
+  --task examples/task.example.yml
+```
+
+See [`docs/API_ORCHESTRATOR.md`](docs/API_ORCHESTRATOR.md) for architecture, runtime use, safety
+boundaries, and honest MVP limitations.
+
 ## Core Files
 
 - [`docs/AI_DEVELOPMENT_PROTOCOL.md`](docs/AI_DEVELOPMENT_PROTOCOL.md) — governance, state machine, evidence and escalation rules.
@@ -38,6 +55,8 @@ The model names are defaults, not hard dependencies. The protocol is based on ro
 - [`docs/ADOPTION.md`](docs/ADOPTION.md) — how other repositories consume `codex-auto`.
 - [`agents/SOL_LEAD_REVIEWER.md`](agents/SOL_LEAD_REVIEWER.md) — Sol lead/reviewer role instructions.
 - [`agents/LUNA_IMPLEMENTER.md`](agents/LUNA_IMPLEMENTER.md) — Luna implementation role instructions.
+- [`docs/API_ORCHESTRATOR.md`](docs/API_ORCHESTRATOR.md) — executable service architecture and use.
+- [`config/orchestrator.example.yml`](config/orchestrator.example.yml) — provider/model routing and policy example.
 - [`.github/ISSUE_TEMPLATE/implementation-task.md`](.github/ISSUE_TEMPLATE/implementation-task.md) — canonical bounded-task issue format.
 - [`.github/pull_request_template.md`](.github/pull_request_template.md) — canonical implementation evidence format.
 
