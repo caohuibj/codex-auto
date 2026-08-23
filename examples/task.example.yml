@@ -1,0 +1,23 @@
+task_id: TASK-001
+title: Add a bounded repository feature
+objective: Add the requested behavior with deterministic tests and no unrelated changes.
+in_scope:
+  - Implement the requested behavior in the named modules.
+  - Add unit tests for the new behavior.
+out_of_scope:
+  - Dependency upgrades unrelated to the task.
+  - Changes to authentication, persistence, or deployment architecture.
+context_paths:
+  - README.md
+  - pyproject.toml
+  - src/**/*.py
+  - tests/**/*.py
+constraints:
+  - Preserve public interfaces unless an acceptance criterion explicitly changes one.
+required_verification:
+  - lint
+  - format
+  - typecheck
+  - unit
+metadata:
+  requested_by: human-product-owner

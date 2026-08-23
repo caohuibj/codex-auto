@@ -1,0 +1,81 @@
+providers:
+  openai:
+    type: openai
+    api_key_env: OPENAI_API_KEY
+    # base_url: https://api.openai.com/v1
+    timeout_seconds: 180
+    store: false
+
+routing:
+  planning:
+    provider: openai
+    model: gpt-5.6-sol
+    reasoning_effort: high
+    max_output_tokens: 8000
+  implementation:
+    provider: openai
+    model: gpt-5.6-luna
+    reasoning_effort: max
+    max_output_tokens: 20000
+  review:
+    provider: openai
+    model: gpt-5.6-sol
+    reasoning_effort: high
+    max_output_tokens: 10000
+  fix:
+    provider: openai
+    model: gpt-5.6-luna
+    reasoning_effort: max
+    max_output_tokens: 12000
+
+github:
+  repository: owner/repository
+  base_branch: main
+  remote: origin
+  feature_branch_prefix: codex-auto/
+  context_max_bytes: 120000
+  allowed_paths:
+    - "**"
+  forbidden_paths:
+    - .env
+    - .env.*
+    - ".git/**"
+    - ".agents/skills/**"
+    - ".codex/**"
+    - ".github/workflows/**"
+    - ".codex-auto/**"
+    - "*.pem"
+    - "*.key"
+    - "**/*.pem"
+    - "**/*.key"
+  allow_deletions: false
+  verification_commands:
+    lint: [uv, run, ruff, check, .]
+    format: [uv, run, ruff, format, --check, .]
+    typecheck: [uv, run, mypy]
+    unit: [uv, run, pytest, -q]
+  required_ci_checks:
+    - quality
+
+policy:
+  max_fix_cycles: 2
+  human_merge_required: true
+  protocol_version: v1
+
+audit:
+  path: .codex-auto/audit/{task_id}.jsonl
+  max_payload_chars: 20000
+
+# Optional accounting hooks. Keep rates explicit and update them from the pricing
+# applicable to your account; zero or an absent model means tokens are tracked
+# without claiming a cost estimate.
+cost:
+  models:
+    gpt-5.6-sol:
+      input_per_million: "0"
+      cached_input_per_million: "0"
+      output_per_million: "0"
+    gpt-5.6-luna:
+      input_per_million: "0"
+      cached_input_per_million: "0"
+      output_per_million: "0"

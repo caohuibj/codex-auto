@@ -1,17 +1,38 @@
 # Adopting codex-auto in Another Project
 
-`codex-auto` should remain the canonical home of generic agent roles, task contracts, and review rules. Target repositories should keep only project-specific configuration and, optionally, thin GitHub templates/workflows that reference the canonical protocol.
+`codex-auto` remains the canonical home of generic agent roles, task contracts, review rules, and
+runtime implementation. Target repositories keep a generated repo-scoped skill, a thin launcher,
+project-specific configuration, and optionally thin GitHub templates/workflows.
 
 ## Recommended Consumer Layout
 
 In the target repository:
 
 ```text
+.agents/skills/codex-auto/
+├── SKILL.md
+└── agents/openai.yaml
+
+.codex/
+├── config.toml
+└── agents/luna-implementer.toml
+
 .codex-auto/
-└── project.yml
+├── bin/codex-auto
+├── project.yml
+├── orchestrator.yml
+├── .env.example
+└── runtime/               # ignored project-local environment
 ```
 
-Do not copy the full Sol/Luna instruction files into every project unless the execution environment cannot read the central repository.
+This layout is created by `codex-auto init-project`. The repo-scoped skill makes the workflow
+discoverable only inside the consumer repository, while the project-local runtime and Codex config
+avoid modifying the system Python, user skill directory, or user-level Codex configuration. In App
+mode the project config fixes the primary Sol route and registers the named Luna worker; route
+mismatches fail closed.
+
+See [`PROJECT_LOCAL_INSTALLATION.md`](PROJECT_LOCAL_INSTALLATION.md) for complete installation,
+ChatGPT desktop local-project setup, invocation, update, and removal instructions.
 
 ## Minimal `project.yml`
 
@@ -101,10 +122,20 @@ A protocol upgrade should not silently change an in-progress Task Contract. The 
 There are two valid deployment styles:
 
 ### Central-only
-The execution agent reads templates directly from `codex-auto`. Target repositories contain only `.codex-auto/project.yml`.
+The execution agent reads templates directly from `codex-auto`. Target repositories contain only
+`.codex-auto/project.yml`. This is protocol-only adoption; it does not install the executable API
+orchestrator or make it automatically discoverable in a ChatGPT/Codex local project.
 
-### Thin local integration
-A target repository may additionally contain local GitHub issue/PR templates or workflows for better GitHub UX. Those files should identify the canonical `codex-auto` version they implement and should remain thin adapters rather than forks of the protocol.
+### Project-local executable integration
+
+Run `init-project` to add the repo-scoped skill, project Sol/Luna agent configuration, local launcher,
+orchestrator configuration, and ignored runtime. This is the recommended style when development
+tasks should invoke codex-auto directly without affecting other projects or user-level Codex
+settings.
+
+A target repository may additionally contain local GitHub issue/PR templates or workflows for
+better GitHub UX. Those files should identify the canonical `codex-auto` version they implement and
+should remain thin adapters rather than forks of the protocol.
 
 ## Project-Specific Rules
 

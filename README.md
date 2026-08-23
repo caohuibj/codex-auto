@@ -27,7 +27,48 @@ Sol High — Independent Reviewer
         +--> BLOCKED -----------> Escalation
 ```
 
-The model names are defaults, not hard dependencies. The protocol is based on role separation: expensive judgment for planning/review, bounded execution for implementation, and repository evidence for coordination.
+The model IDs are configurable, but each run is fail-closed: the App must use the configured Sol
+planning/review route and the configured Luna implementation/fix route exactly. It never silently
+substitutes another model. The protocol is based on role separation: expensive judgment for
+planning/review, bounded execution for implementation, and repository evidence for coordination.
+
+## ChatGPT App-native Orchestrator (default)
+
+For users signed in to the ChatGPT desktop App, `codex-auto` now uses the App itself as the model
+runtime. Sol remains the primary planning/review task and delegates implementation/fixes to native
+Luna subagents. Repository-local checkpoints validate every state transition, Task Contract, PR/CI
+evidence, bounded fix cycle, and human merge gate. They do not call the OpenAI API, copy ChatGPT
+credentials, or invoke Codex CLI as a model backend.
+
+ChatGPT subscriptions and API billing are separate. A Plus subscription can run this App-native
+workflow within its Codex allowance, but it cannot be used as an `OPENAI_API_KEY`.
+
+See [`docs/CHATGPT_APP_ORCHESTRATION.md`](docs/CHATGPT_APP_ORCHESTRATION.md) and
+[`docs/PROJECT_LOCAL_INSTALLATION.md`](docs/PROJECT_LOCAL_INSTALLATION.md). First-time users can
+follow the standalone Chinese walkthrough
+[`docs/CHATGPT_APP_EDUK12_BEGINNER_GUIDE.md`](docs/CHATGPT_APP_EDUK12_BEGINNER_GUIDE.md).
+
+## Responses API Orchestrator (optional)
+
+The repository also includes a minimal Python service that executes this protocol with configurable
+Sol/Luna routes over the OpenAI Responses API. It validates a model-generated Task Contract, applies
+bounded implementation/fix patches on a feature branch, opens a GitHub PR, collects actual diff/CI
+evidence, independently reviews it, and stops at a human merge gate.
+
+```bash
+uv sync --extra api --extra dev
+uv run codex-auto validate \
+  --config config/orchestrator.example.yml \
+  --task examples/task.example.yml
+```
+
+See [`docs/API_ORCHESTRATOR.md`](docs/API_ORCHESTRATOR.md) for architecture, runtime use, safety
+boundaries, and honest MVP limitations.
+
+To install codex-auto into one ChatGPT local project without changing global Python, skills,
+plugins, or Codex configuration, follow
+[`docs/PROJECT_LOCAL_INSTALLATION.md`](docs/PROJECT_LOCAL_INSTALLATION.md). The `init-project`
+command creates a repo-scoped `.agents/skills/codex-auto` entry and project-local runtime launcher.
 
 ## Core Files
 
@@ -38,6 +79,11 @@ The model names are defaults, not hard dependencies. The protocol is based on ro
 - [`docs/ADOPTION.md`](docs/ADOPTION.md) — how other repositories consume `codex-auto`.
 - [`agents/SOL_LEAD_REVIEWER.md`](agents/SOL_LEAD_REVIEWER.md) — Sol lead/reviewer role instructions.
 - [`agents/LUNA_IMPLEMENTER.md`](agents/LUNA_IMPLEMENTER.md) — Luna implementation role instructions.
+- [`docs/API_ORCHESTRATOR.md`](docs/API_ORCHESTRATOR.md) — executable service architecture and use.
+- [`docs/CHATGPT_APP_ORCHESTRATION.md`](docs/CHATGPT_APP_ORCHESTRATION.md) — Plus/App-native runtime and deterministic checkpoints.
+- [`docs/PROJECT_LOCAL_INSTALLATION.md`](docs/PROJECT_LOCAL_INSTALLATION.md) — isolated per-project installation and direct ChatGPT/Codex use.
+- [`docs/CHATGPT_APP_EDUK12_BEGINNER_GUIDE.md`](docs/CHATGPT_APP_EDUK12_BEGINNER_GUIDE.md) — first-use ChatGPT App setup with an eduK12 example.
+- [`config/orchestrator.example.yml`](config/orchestrator.example.yml) — provider/model routing and policy example.
 - [`.github/ISSUE_TEMPLATE/implementation-task.md`](.github/ISSUE_TEMPLATE/implementation-task.md) — canonical bounded-task issue format.
 - [`.github/pull_request_template.md`](.github/pull_request_template.md) — canonical implementation evidence format.
 
@@ -46,11 +92,14 @@ The model names are defaults, not hard dependencies. The protocol is based on ro
 Recommended target-repository integration is intentionally small:
 
 ```text
-.codex-auto/
-└── project.yml
+.agents/skills/codex-auto/   # repo-scoped discovery
+.codex/                      # exact Sol default and named Luna subagent
+.codex-auto/                 # project profile, routing, launcher, local runtime
 ```
 
-The profile pins the `codex-auto` protocol version and adds only project-specific branch, architecture, persistence, verification, runtime, and escalation constraints. Generic Sol/Luna behavior remains centralized here.
+`init-project` creates these entries. The project profile pins the protocol version and adds
+project-specific branch, architecture, verification, runtime, and escalation constraints. Generic
+Sol/Luna behavior remains centralized here.
 
 See [`docs/ADOPTION.md`](docs/ADOPTION.md).
 
