@@ -22,6 +22,26 @@ class EvidenceGateViolation(ValueError):
     pass
 
 
+def validate_pull_request_identity(
+    contract: TaskContract,
+    evidence: PullRequestEvidence,
+    expected_head_branch: str,
+) -> None:
+    errors: list[str] = []
+    if evidence.base_branch != contract.base_branch:
+        errors.append(
+            f"PR base branch {evidence.base_branch!r} != contract {contract.base_branch!r}"
+        )
+    if evidence.base_sha != contract.base_sha:
+        errors.append(f"PR merge base {evidence.base_sha} != contract base {contract.base_sha}")
+    if evidence.head_branch != expected_head_branch:
+        errors.append(
+            f"PR head branch {evidence.head_branch!r} != task branch {expected_head_branch!r}"
+        )
+    if errors:
+        raise EvidenceGateViolation("; ".join(errors))
+
+
 def build_contract(
     request: TaskRequest,
     plan: PlanProposal,
@@ -60,15 +80,13 @@ def build_contract(
 
 
 def validate_evidence(
-    contract: TaskContract, evidence: PullRequestEvidence, config: AppConfig
+    contract: TaskContract,
+    evidence: PullRequestEvidence,
+    config: AppConfig,
+    expected_head_branch: str,
 ) -> None:
+    validate_pull_request_identity(contract, evidence, expected_head_branch)
     errors: list[str] = []
-    if evidence.base_branch != contract.base_branch:
-        errors.append(
-            f"PR base branch {evidence.base_branch!r} != contract {contract.base_branch!r}"
-        )
-    if evidence.base_sha != contract.base_sha:
-        errors.append(f"PR merge base {evidence.base_sha} != contract base {contract.base_sha}")
     if not evidence.diff.strip():
         errors.append("PR diff is empty")
 

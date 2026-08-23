@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from codex_auto.config import load_config
+from codex_auto.config import load_config, validate_chatgpt_app_routes
 from codex_auto.project_init import (
     ProjectInitError,
     initialize_project,
@@ -51,12 +51,13 @@ def test_initialize_project_creates_repo_scoped_runtime_and_skill(tmp_path):
     created = init(root)
     config = load_config(root / ".codex-auto/orchestrator.yml")
 
-    assert len(created) == 7
+    assert len(created) == 9
     assert config.github.repository == "owner/example"
     assert config.github.base_branch == "dev"
     assert config.github.verification_commands["unit"] == ["uv", "run", "pytest", "-q"]
     assert config.github.required_ci_checks == ["quality"]
     assert ".agents/skills/**" in config.github.forbidden_paths
+    assert ".codex/**" in config.github.forbidden_paths
     assert config.routing.planning.model == "sol-model"
     assert config.routing.implementation.model == "luna-model"
     assert config.providers["chatgpt_app"].type == "chatgpt_app"
@@ -69,6 +70,14 @@ def test_initialize_project_creates_repo_scoped_runtime_and_skill(tmp_path):
     assert "Do not invoke Codex CLI" in skill
     assert (root / ".agents/skills/codex-auto/references/app-workflow.md").exists()
     assert (root / ".codex-auto/bin/codex-auto").stat().st_mode & 0o111
+
+    project_config = (root / ".codex/config.toml").read_text(encoding="utf-8")
+    luna_agent = (root / ".codex/agents/luna-implementer.toml").read_text(encoding="utf-8")
+    assert 'model = "sol-model"' in project_config
+    assert 'default_subagent_model = "luna-model"' in project_config
+    assert 'name = "luna_implementer"' in luna_agent
+    assert 'model = "luna-model"' in luna_agent
+    validate_chatgpt_app_routes(config, root)
 
     gitignore = (root / ".gitignore").read_text(encoding="utf-8")
     assert ".codex-auto/runtime/" in gitignore
@@ -98,6 +107,29 @@ def test_initialize_project_can_explicitly_select_responses_api(tmp_path):
     assert (root / ".codex-auto/.env.example").read_text(encoding="utf-8") == (
         "OPENAI_API_KEY=replace_me\n"
     )
+    assert not (root / ".codex/config.toml").exists()
+
+
+def test_chatgpt_app_route_validation_fails_closed_on_model_drift(tmp_path):
+    root = make_repo(tmp_path)
+    init(root)
+    agent_path = root / ".codex/agents/luna-implementer.toml"
+    agent_path.write_text(
+        agent_path.read_text(encoding="utf-8").replace('model = "luna-model"', 'model = "other"'),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="luna_implementer route mismatch"):
+        validate_chatgpt_app_routes(load_config(root / ".codex-auto/orchestrator.yml"), root)
+
+
+def test_chatgpt_app_route_validation_requires_project_agent_files(tmp_path):
+    root = make_repo(tmp_path)
+    init(root)
+    (root / ".codex/agents/luna-implementer.toml").unlink()
+
+    with pytest.raises(ValueError, match="missing or invalid"):
+        validate_chatgpt_app_routes(load_config(root / ".codex-auto/orchestrator.yml"), root)
 
 
 def test_initialize_project_is_idempotent_and_does_not_duplicate_gitignore(tmp_path):

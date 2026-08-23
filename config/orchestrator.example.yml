@@ -41,6 +41,7 @@ github:
     - .env.*
     - ".git/**"
     - ".agents/skills/**"
+    - ".codex/**"
     - ".github/workflows/**"
     - ".codex-auto/**"
     - "*.pem"

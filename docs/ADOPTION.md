@@ -13,6 +13,10 @@ In the target repository:
 ├── SKILL.md
 └── agents/openai.yaml
 
+.codex/
+├── config.toml
+└── agents/luna-implementer.toml
+
 .codex-auto/
 ├── bin/codex-auto
 ├── project.yml
@@ -22,8 +26,10 @@ In the target repository:
 ```
 
 This layout is created by `codex-auto init-project`. The repo-scoped skill makes the workflow
-discoverable only inside the consumer repository, while the project-local runtime avoids modifying
-the system Python, user skill directory, or global Codex configuration.
+discoverable only inside the consumer repository, while the project-local runtime and Codex config
+avoid modifying the system Python, user skill directory, or user-level Codex configuration. In App
+mode the project config fixes the primary Sol route and registers the named Luna worker; route
+mismatches fail closed.
 
 See [`PROJECT_LOCAL_INSTALLATION.md`](PROJECT_LOCAL_INSTALLATION.md) for complete installation,
 ChatGPT desktop local-project setup, invocation, update, and removal instructions.
@@ -122,9 +128,10 @@ orchestrator or make it automatically discoverable in a ChatGPT/Codex local proj
 
 ### Project-local executable integration
 
-Run `init-project` to add the repo-scoped skill, local launcher, orchestrator configuration, and
-ignored runtime. This is the recommended style when development tasks should invoke codex-auto
-directly without affecting other projects or user-level Codex settings.
+Run `init-project` to add the repo-scoped skill, project Sol/Luna agent configuration, local launcher,
+orchestrator configuration, and ignored runtime. This is the recommended style when development
+tasks should invoke codex-auto directly without affecting other projects or user-level Codex
+settings.
 
 A target repository may additionally contain local GitHub issue/PR templates or workflows for
 better GitHub UX. Those files should identify the canonical `codex-auto` version they implement and

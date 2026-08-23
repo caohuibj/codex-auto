@@ -12,7 +12,7 @@ import yaml
 
 from codex_auto.app_workflow import AppSessionStore, ChatGPTAppWorkflow, write_session_packet
 from codex_auto.audit import JsonlAuditLog
-from codex_auto.config import load_config
+from codex_auto.config import load_config, validate_chatgpt_app_routes
 from codex_auto.github import LocalGitHubAdapter
 from codex_auto.models import PlanProposal, ReviewResult, TaskRequest, TaskState
 from codex_auto.orchestrator import Orchestrator
@@ -96,6 +96,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _app_runtime(args: argparse.Namespace) -> tuple[ChatGPTAppWorkflow, AppSessionStore]:
     config = load_config(args.config)
+    validate_chatgpt_app_routes(config, args.repo_path)
     store = AppSessionStore(args.session)
     if args.command == "app-start":
         task_id = TaskRequest.model_validate(_load_mapping(args.task)).task_id

@@ -18,8 +18,12 @@ API, or an SDK as a model backend. The project-local `codex-auto` executable bel
 deterministic validator/state recorder; it performs no model call.
 
 Before starting, confirm that the primary task model matches the configured planning/review route
-and that native delegation can create the configured Luna implementation/fix route. If either exact
-route is unavailable, stop with a precise blocker; do not silently substitute a model or implement
+and that native delegation can create the project agent named `luna_implementer` with the exact
+configured Luna implementation/fix model and effort. Check `.codex/config.toml`,
+`.codex/agents/luna-implementer.toml`, and `.codex-auto/orchestrator.yml`; the first checkpoint will
+also reject any mismatch. If the selected primary model cannot be confirmed, the named agent is
+missing, its configured model is unavailable, or either exact route differs, stop with a precise
+blocker. Never silently substitute a model, use the inherited Sol model for the worker, or implement
 inside the Sol task.
 
 1. Convert the request into one bounded TaskRequest YAML under `.codex-auto/tasks/<task-id>.yml`.
@@ -33,8 +37,9 @@ inside the Sol task.
 3. As Sol, inspect the packet and repository, write a PlanProposal YAML matching
    `references/app-workflow.md`, then validate it with `app-accept-plan`.
 4. Run `app-begin-implementation`. Delegate the validated contract and feature branch to exactly one
-   Luna subagent. Luna may edit only contract scope, run named checks, commit, push, and open/update
-   the PR. Wait for it to finish; do not implement in the Sol task.
+   `luna_implementer` subagent. Luna may edit only contract scope, run named checks, commit, push,
+   and open/update the PR. Confirm that the App shows the expected named agent and Luna route before
+   accepting its work. Wait for it to finish; do not implement in the Sol task.
 5. Record the PR with `app-record-pr --pr-number <n>`, then run `app-begin-review`. As Sol, review
    the actual packet diff, checks, and contract; write a ReviewResult YAML and submit it with
    `app-submit-review`.

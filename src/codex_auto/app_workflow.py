@@ -8,7 +8,12 @@ from pathlib import Path
 
 from codex_auto.audit import JsonlAuditLog
 from codex_auto.config import AppConfig
-from codex_auto.contract import build_contract, validate_evidence, validate_review
+from codex_auto.contract import (
+    build_contract,
+    validate_evidence,
+    validate_pull_request_identity,
+    validate_review,
+)
 from codex_auto.models import (
     AppSession,
     OrchestrationResult,
@@ -143,9 +148,11 @@ class ChatGPTAppWorkflow:
         if session.state != TaskState.IMPLEMENTING or session.contract is None:
             raise AppWorkflowError("PR evidence can only be recorded after implementation starts")
         verification = self.github.run_verification(session.contract.verification)
-        session.pull_request_evidence = self.github.collect_pull_request_evidence(
-            number, verification
-        )
+        evidence = self.github.collect_pull_request_evidence(number, verification)
+        if session.feature_branch is None:
+            raise AppWorkflowError("feature branch is missing from the App session")
+        validate_pull_request_identity(session.contract, evidence, session.feature_branch)
+        session.pull_request_evidence = evidence
         self._transition(
             session,
             TaskState.PR_OPEN,
@@ -186,7 +193,14 @@ class ChatGPTAppWorkflow:
             review.model_dump(mode="json"),
         )
         if review.decision == ReviewDecision.APPROVED:
-            validate_evidence(session.contract, session.pull_request_evidence, self.config)
+            if session.feature_branch is None:
+                raise AppWorkflowError("feature branch is missing from the App session")
+            validate_evidence(
+                session.contract,
+                session.pull_request_evidence,
+                self.config,
+                session.feature_branch,
+            )
             self._transition(session, TaskState.MERGE_READY, human_merge_required=True)
             self.audit.append(
                 "human_merge_gate.reached",
@@ -220,9 +234,11 @@ class ChatGPTAppWorkflow:
         if session.state != TaskState.FIXING or session.contract is None:
             raise AppWorkflowError("fix evidence can only be recorded while FIXING")
         verification = self.github.run_verification(session.contract.verification)
-        session.pull_request_evidence = self.github.collect_pull_request_evidence(
-            number, verification
-        )
+        evidence = self.github.collect_pull_request_evidence(number, verification)
+        if session.feature_branch is None:
+            raise AppWorkflowError("feature branch is missing from the App session")
+        validate_pull_request_identity(session.contract, evidence, session.feature_branch)
+        session.pull_request_evidence = evidence
         self._transition(
             session,
             TaskState.REVIEWING,

@@ -5,6 +5,7 @@ from codex_auto.contract import (
     EvidenceGateViolation,
     build_contract,
     validate_evidence,
+    validate_pull_request_identity,
     validate_review,
 )
 from codex_auto.models import ReviewDecision, VerificationStatus
@@ -101,6 +102,23 @@ def test_evidence_gate_requires_passing_contract_verification():
     )
 
     with pytest.raises(EvidenceGateViolation, match="NOT_RUN"):
-        validate_evidence(contract, evidence, make_config())
+        validate_evidence(contract, evidence, make_config(), "codex-auto/task-001")
 
     assert evidence.head_sha == HEAD_ONE
+
+
+def test_pr_identity_requires_the_task_feature_branch():
+    adapter = MockGitHubAdapter()
+    adapter.commit_count = 1
+    evidence = adapter.collect_pull_request_evidence(7, adapter.run_verification(["unit"]))
+    contract = build_contract(
+        make_request(),
+        make_plan(),
+        repository="owner/repo",
+        base_branch="main",
+        base_sha=BASE_SHA,
+        config=make_config(),
+    )
+
+    with pytest.raises(EvidenceGateViolation, match="head branch"):
+        validate_pull_request_identity(contract, evidence, "codex-auto/other-task")

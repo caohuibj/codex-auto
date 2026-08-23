@@ -10,7 +10,12 @@ from pydantic import BaseModel
 
 from codex_auto.audit import JsonlAuditLog, redact
 from codex_auto.config import AppConfig, ModelRoute
-from codex_auto.contract import build_contract, validate_evidence, validate_review
+from codex_auto.contract import (
+    build_contract,
+    validate_evidence,
+    validate_pull_request_identity,
+    validate_review,
+)
 from codex_auto.cost import CostLedger
 from codex_auto.models import (
     ImplementationProposal,
@@ -215,6 +220,7 @@ class Orchestrator:
             )
             self._transition(TaskState.PR_OPEN, number=number, url=url)
             evidence = self.github.collect_pull_request_evidence(number, verification)
+            validate_pull_request_identity(contract, evidence, branch)
 
             while True:
                 self._transition(TaskState.REVIEWING, head_sha=evidence.head_sha)
@@ -243,7 +249,7 @@ class Orchestrator:
                 )
 
                 if review.decision == ReviewDecision.APPROVED:
-                    validate_evidence(contract, evidence, self.config)
+                    validate_evidence(contract, evidence, self.config, branch)
                     self._transition(
                         TaskState.MERGE_READY,
                         human_merge_required=self.config.policy.human_merge_required,
@@ -304,6 +310,7 @@ class Orchestrator:
                 verification = self.github.run_verification(contract.verification)
                 self.github.commit_and_push(branch, fix.commit_message, paths)
                 evidence = self.github.collect_pull_request_evidence(number, verification)
+                validate_pull_request_identity(contract, evidence, branch)
                 self.audit.append(
                     "fix.completed",
                     self.state.state,

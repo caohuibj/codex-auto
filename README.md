@@ -27,7 +27,10 @@ Sol High — Independent Reviewer
         +--> BLOCKED -----------> Escalation
 ```
 
-The model names are defaults, not hard dependencies. The protocol is based on role separation: expensive judgment for planning/review, bounded execution for implementation, and repository evidence for coordination.
+The model IDs are configurable, but each run is fail-closed: the App must use the configured Sol
+planning/review route and the configured Luna implementation/fix route exactly. It never silently
+substitutes another model. The protocol is based on role separation: expensive judgment for
+planning/review, bounded execution for implementation, and repository evidence for coordination.
 
 ## ChatGPT App-native Orchestrator (default)
 
@@ -41,7 +44,9 @@ ChatGPT subscriptions and API billing are separate. A Plus subscription can run 
 workflow within its Codex allowance, but it cannot be used as an `OPENAI_API_KEY`.
 
 See [`docs/CHATGPT_APP_ORCHESTRATION.md`](docs/CHATGPT_APP_ORCHESTRATION.md) and
-[`docs/PROJECT_LOCAL_INSTALLATION.md`](docs/PROJECT_LOCAL_INSTALLATION.md).
+[`docs/PROJECT_LOCAL_INSTALLATION.md`](docs/PROJECT_LOCAL_INSTALLATION.md). First-time users can
+follow the standalone Chinese walkthrough
+[`docs/CHATGPT_APP_EDUK12_BEGINNER_GUIDE.md`](docs/CHATGPT_APP_EDUK12_BEGINNER_GUIDE.md).
 
 ## Responses API Orchestrator (optional)
 
@@ -77,6 +82,7 @@ command creates a repo-scoped `.agents/skills/codex-auto` entry and project-loca
 - [`docs/API_ORCHESTRATOR.md`](docs/API_ORCHESTRATOR.md) — executable service architecture and use.
 - [`docs/CHATGPT_APP_ORCHESTRATION.md`](docs/CHATGPT_APP_ORCHESTRATION.md) — Plus/App-native runtime and deterministic checkpoints.
 - [`docs/PROJECT_LOCAL_INSTALLATION.md`](docs/PROJECT_LOCAL_INSTALLATION.md) — isolated per-project installation and direct ChatGPT/Codex use.
+- [`docs/CHATGPT_APP_EDUK12_BEGINNER_GUIDE.md`](docs/CHATGPT_APP_EDUK12_BEGINNER_GUIDE.md) — first-use ChatGPT App setup with an eduK12 example.
 - [`config/orchestrator.example.yml`](config/orchestrator.example.yml) — provider/model routing and policy example.
 - [`.github/ISSUE_TEMPLATE/implementation-task.md`](.github/ISSUE_TEMPLATE/implementation-task.md) — canonical bounded-task issue format.
 - [`.github/pull_request_template.md`](.github/pull_request_template.md) — canonical implementation evidence format.
@@ -87,6 +93,7 @@ Recommended target-repository integration is intentionally small:
 
 ```text
 .agents/skills/codex-auto/   # repo-scoped discovery
+.codex/                      # exact Sol default and named Luna subagent
 .codex-auto/                 # project profile, routing, launcher, local runtime
 ```
 

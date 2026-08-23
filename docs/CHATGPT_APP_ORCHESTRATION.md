@@ -6,6 +6,11 @@ ChatGPT Plus 与 OpenAI API 是不同的认证和计费系统。Plus 不会生�
 `OPENAI_API_KEY`。本模式因此不让 Python 服务调用模型，而让已经登录 Plus 的 ChatGPT 桌面 App
 成为模型运行时：Sol 主任务负责 planning/review，App 原生 Luna 子代理负责 implementation/fix。
 
+项目安装器把 Sol 默认值写入 `.codex/config.toml`，并创建项目级自定义 agent
+`.codex/agents/luna-implementer.toml`。App 必须选择与 planning/review 路由完全一致的 Sol 模型与
+effort，implementation/fix 必须直接委派给这个命名 agent。配置漂移、模型不可用、agent 缺失或
+身份无法确认都会停止流程；不允许静默替换模型，也不允许 Sol 代替 Luna 实现。
+
 仓库中的 Python 程序只处理确定性工作：状态转换、Task Contract 校验、分支基线、验证命令、PR
 diff/CI 证据、修复次数、审计日志和人工 merge 门禁。它不会读取或复制 ChatGPT 登录 token，也不会
 把 Codex CLI、SDK 或 App Server 当作隐藏模型后端。
@@ -21,7 +26,7 @@ diff/CI 证据、修复次数、审计日志和人工 merge 门禁。它不会�
 ChatGPT desktop App
 └── Sol primary task
     ├── planning -> PlanProposal
-    ├── native delegation -> Luna implementation
+    ├── native delegation -> luna_implementer (exact Luna route)
     ├── PR/CI evidence -> Sol review
     ├── native delegation -> Luna bounded fix (0..N)
     └── MERGE_READY -> human merge only
@@ -34,6 +39,10 @@ repository-local validator
 ├── append-only JSONL audit
 └── no model authentication or model call
 ```
+
+validator 会校验 `.codex/config.toml`、`.codex/agents/luna-implementer.toml` 与
+`.codex-auto/orchestrator.yml` 的模型/effort 完全一致。App 当前不会把实际运行模型身份暴露给项目内
+程序，因此账户侧可用性和当前界面选择还必须由主任务在委派前确认；不能确认时状态是 blocker。
 
 ## 结构化文件
 

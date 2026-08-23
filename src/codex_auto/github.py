@@ -167,8 +167,8 @@ class LocalGitHubAdapter:
                     if not raw_path.startswith(("a/", "b/")):
                         raise GitHubAdapterError(f"unsafe unified diff header: {line!r}")
                     self._validate_path(raw_path[2:])
-            if line == "+++ /dev/null" and not self.config.allow_deletions:
-                raise GitHubAdapterError("file deletion is disabled by policy")
+                elif line.startswith("+++ ") and not self.config.allow_deletions:
+                    raise GitHubAdapterError("file deletion is disabled by policy")
         if not paths:
             raise GitHubAdapterError("proposal does not contain a git unified diff")
         return list(dict.fromkeys(paths))

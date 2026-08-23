@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tomllib
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Literal
@@ -56,6 +57,7 @@ class GitHubConfig(StrictModel):
             ".env.*",
             ".git/**",
             ".agents/skills/**",
+            ".codex/**",
             ".github/workflows/**",
             ".codex-auto/**",
             "*.pem",
@@ -128,3 +130,72 @@ def load_config(path: str | Path) -> AppConfig:
     if not isinstance(raw, dict):
         raise ValueError("configuration root must be a mapping")
     return AppConfig.model_validate(raw)
+
+
+def validate_chatgpt_app_routes(config: AppConfig, repo_path: str | Path) -> None:
+    """Fail closed when repo-local App and orchestrator routes do not match exactly."""
+
+    routes = config.routing
+    route_pairs = (
+        ("planning", routes.planning),
+        ("implementation", routes.implementation),
+        ("review", routes.review),
+        ("fix", routes.fix),
+    )
+    for phase, route in route_pairs:
+        provider = config.providers[route.provider]
+        if provider.type != "chatgpt_app":
+            raise ValueError(f"App checkpoint route {phase} must use a chatgpt_app provider")
+    if (routes.planning.model, routes.planning.reasoning_effort) != (
+        routes.review.model,
+        routes.review.reasoning_effort,
+    ):
+        raise ValueError("planning and review must use the same exact Sol model and effort")
+    if (routes.implementation.model, routes.implementation.reasoning_effort) != (
+        routes.fix.model,
+        routes.fix.reasoning_effort,
+    ):
+        raise ValueError("implementation and fix must use the same exact Luna model and effort")
+
+    root = Path(repo_path).resolve()
+    project_path = root / ".codex/config.toml"
+    agent_path = root / ".codex/agents/luna-implementer.toml"
+    try:
+        with project_path.open("rb") as handle:
+            project = tomllib.load(handle)
+        with agent_path.open("rb") as handle:
+            agent = tomllib.load(handle)
+    except (FileNotFoundError, tomllib.TOMLDecodeError) as exc:
+        raise ValueError(
+            "ChatGPT App route configuration is missing or invalid; rerun init-project and "
+            "do not substitute models"
+        ) from exc
+
+    agents = project.get("agents")
+    expected_project = {
+        "model": routes.planning.model,
+        "model_reasoning_effort": routes.planning.reasoning_effort,
+    }
+    for key, expected in expected_project.items():
+        if project.get(key) != expected:
+            raise ValueError(f"ChatGPT App primary route mismatch for {key}; refusing to continue")
+    if not isinstance(agents, dict) or agents.get("enabled") is not True:
+        raise ValueError("ChatGPT App subagents must be enabled; refusing to continue")
+    expected_subagent = {
+        "default_subagent_model": routes.implementation.model,
+        "default_subagent_reasoning_effort": routes.implementation.reasoning_effort,
+    }
+    for key, expected in expected_subagent.items():
+        if agents.get(key) != expected:
+            raise ValueError(f"ChatGPT App Luna route mismatch for {key}; refusing to continue")
+    if agents.get("max_concurrent_threads_per_session") != 1:
+        raise ValueError("ChatGPT App workflow requires exactly one concurrent Luna subagent")
+
+    expected_agent = {
+        "name": "luna_implementer",
+        "model": routes.implementation.model,
+        "model_reasoning_effort": routes.implementation.reasoning_effort,
+    }
+    for key, expected in expected_agent.items():
+        if agent.get(key) != expected:
+            raise ValueError(f"luna_implementer route mismatch for {key}; refusing to continue")

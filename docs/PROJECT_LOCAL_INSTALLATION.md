@@ -19,6 +19,9 @@ target-repository/
 ├── .agents/skills/codex-auto/
 │   ├── SKILL.md
 │   └── agents/openai.yaml
+├── .codex/
+│   ├── config.toml                 # Sol High default + one Luna Max subagent
+│   └── agents/luna-implementer.toml
 └── .codex-auto/
     ├── bin/codex-auto
     ├── project.yml
@@ -112,7 +115,7 @@ orchestrator 只在 clean worktree 上创建 feature branch。先检查生成的
 项目级集成提交到目标仓库：
 
 ```bash
-git add .agents/skills/codex-auto .codex-auto .gitignore
+git add .agents/skills/codex-auto .codex .codex-auto .gitignore
 git commit -m "chore: install project-local codex-auto"
 ```
 
@@ -195,8 +198,15 @@ skill 会创建项目内 TaskRequest，并通过 `app-*` checkpoint 驱动持久
 
 最终停在 GitHub PR 的 human merge gate，不会 merge。
 
+App 模式下，初始化器还会把主任务默认路由写入 `.codex/config.toml`，并创建项目 agent
+`luna_implementer`。开始前必须在 App 输入框下方确认实际选择的是配置中的 Sol/effort；实现与修复
+必须直接委派给这个命名 agent。checkpoint 会验证 `.codex/config.toml`、agent 文件与
+`.codex-auto/orchestrator.yml` 完全一致。指定 Sol、Luna 或 effort 不可用时必须停止，不能静默替换。
+
 完整阶段和 PlanProposal/ReviewResult 格式见
 [`CHATGPT_APP_ORCHESTRATION.md`](CHATGPT_APP_ORCHESTRATION.md)。
+第一次配置可直接按照
+[`CHATGPT_APP_EDUK12_BEGINNER_GUIDE.md`](CHATGPT_APP_EDUK12_BEGINNER_GUIDE.md) 操作。
 
 ## 多个 Project 如何保持互不影响
 
@@ -220,8 +230,10 @@ uv pip install --upgrade \
   "git+https://github.com/caohuibj/codex-auto.git@<new-tag-or-commit>"
 ```
 
-移除时，删除目标仓库内的 `.agents/skills/codex-auto` 和 `.codex-auto`，再移除 `.gitignore`
-中的 `# codex-auto project-local runtime` 区块即可。其他 project 和用户级 Codex 配置不会改变。
+移除时，删除目标仓库内的 `.agents/skills/codex-auto`、`.codex/agents/luna-implementer.toml` 和
+`.codex-auto`，人工清理 `.codex/config.toml` 中由本工具管理的设置，再移除 `.gitignore` 中的
+`# codex-auto project-local runtime` 区块。不要删除项目里其他工具已有的 Codex 设置；其他 project
+和用户级 Codex 配置不会改变。
 
 ## 当前真实边界
 

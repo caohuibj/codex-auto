@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shlex
 from importlib.resources import files
 from pathlib import Path
@@ -69,6 +70,36 @@ def parse_verification_specs(specs: list[str]) -> dict[str, list[str]]:
 def _render_template(relative_path: str, repository: str) -> str:
     template = files("codex_auto").joinpath("templates", relative_path).read_text(encoding="utf-8")
     return template.replace("__REPOSITORY__", repository)
+
+
+def _codex_project_config(sol_model: str, luna_model: str) -> str:
+    return (
+        f"model = {json.dumps(sol_model)}\n"
+        'model_reasoning_effort = "high"\n\n'
+        "[agents]\n"
+        "enabled = true\n"
+        "max_concurrent_threads_per_session = 1\n"
+        f"default_subagent_model = {json.dumps(luna_model)}\n"
+        'default_subagent_reasoning_effort = "max"\n'
+    )
+
+
+def _luna_agent_config(repository: str, luna_model: str) -> str:
+    return (
+        'name = "luna_implementer"\n'
+        'description = "Bounded implementation and fix worker for the codex-auto workflow."\n'
+        f"model = {json.dumps(luna_model)}\n"
+        'model_reasoning_effort = "max"\n'
+        'developer_instructions = """\n'
+        f"Work only in {repository} and only on the Task Contract feature branch.\n"
+        "Implement or fix only the delegated contract scope, run its named checks, and report "
+        "commit, PR, and verification evidence to the parent Sol task.\n"
+        "Never plan, independently review, merge, change orchestration policy, or edit .codex, "
+        ".codex-auto, .agents/skills, or .github/workflows.\n"
+        "For an explicit configuration probe, make no edits and report the configured model and "
+        "agent identity.\n"
+        '"""\n'
+    )
 
 
 def _write_managed(path: Path, content: str, *, force: bool, executable: bool = False) -> None:
@@ -221,6 +252,19 @@ def initialize_project(
             False,
         ),
     }
+    if app_native:
+        managed.update(
+            {
+                root / ".codex/config.toml": (
+                    _codex_project_config(sol_model, luna_model),
+                    False,
+                ),
+                root / ".codex/agents/luna-implementer.toml": (
+                    _luna_agent_config(repository, luna_model),
+                    False,
+                ),
+            }
+        )
     conflicts = [
         path
         for path, (content, _) in managed.items()

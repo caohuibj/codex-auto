@@ -43,12 +43,24 @@ def test_default_policy_rejects_root_secret_key():
 
     assert adapter._is_allowed("production.key") is False
     assert adapter._is_allowed(".agents/skills/codex-auto/SKILL.md") is False
+    assert adapter._is_allowed(".codex/config.toml") is False
     assert adapter._is_allowed(".github/workflows/ci.yml") is False
     assert adapter._is_allowed(".codex-auto/project.yml") is False
 
 
 def test_patch_policy_rejects_deletion_by_default():
     patch = "diff --git a/src/app.py b/src/app.py\n--- a/src/app.py\n+++ /dev/null\n"
+
+    with pytest.raises(GitHubAdapterError, match="deletion is disabled"):
+        make_adapter()._paths_from_patch(patch)
+
+
+def test_patch_policy_rejects_deletion_header_with_timestamp():
+    patch = (
+        "diff --git a/src/app.py b/src/app.py\n"
+        "--- a/src/app.py\t2026-08-24 10:00:00\n"
+        "+++ /dev/null\t2026-08-24 10:00:00\n"
+    )
 
     with pytest.raises(GitHubAdapterError, match="deletion is disabled"):
         make_adapter()._paths_from_patch(patch)
