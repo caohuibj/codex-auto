@@ -46,6 +46,11 @@ uv run codex-auto validate \
 See [`docs/API_ORCHESTRATOR.md`](docs/API_ORCHESTRATOR.md) for architecture, runtime use, safety
 boundaries, and honest MVP limitations.
 
+To install codex-auto into one ChatGPT/Codex local project without changing global Python, skills,
+plugins, or Codex configuration, follow
+[`docs/PROJECT_LOCAL_INSTALLATION.md`](docs/PROJECT_LOCAL_INSTALLATION.md). The `init-project`
+command creates a repo-scoped `.agents/skills/codex-auto` entry and project-local runtime launcher.
+
 ## Core Files
 
 - [`docs/AI_DEVELOPMENT_PROTOCOL.md`](docs/AI_DEVELOPMENT_PROTOCOL.md) — governance, state machine, evidence and escalation rules.
@@ -56,6 +61,7 @@ boundaries, and honest MVP limitations.
 - [`agents/SOL_LEAD_REVIEWER.md`](agents/SOL_LEAD_REVIEWER.md) — Sol lead/reviewer role instructions.
 - [`agents/LUNA_IMPLEMENTER.md`](agents/LUNA_IMPLEMENTER.md) — Luna implementation role instructions.
 - [`docs/API_ORCHESTRATOR.md`](docs/API_ORCHESTRATOR.md) — executable service architecture and use.
+- [`docs/PROJECT_LOCAL_INSTALLATION.md`](docs/PROJECT_LOCAL_INSTALLATION.md) — isolated per-project installation and direct ChatGPT/Codex use.
 - [`config/orchestrator.example.yml`](config/orchestrator.example.yml) — provider/model routing and policy example.
 - [`.github/ISSUE_TEMPLATE/implementation-task.md`](.github/ISSUE_TEMPLATE/implementation-task.md) — canonical bounded-task issue format.
 - [`.github/pull_request_template.md`](.github/pull_request_template.md) — canonical implementation evidence format.
@@ -65,11 +71,13 @@ boundaries, and honest MVP limitations.
 Recommended target-repository integration is intentionally small:
 
 ```text
-.codex-auto/
-└── project.yml
+.agents/skills/codex-auto/   # repo-scoped discovery
+.codex-auto/                 # project profile, routing, launcher, local runtime
 ```
 
-The profile pins the `codex-auto` protocol version and adds only project-specific branch, architecture, persistence, verification, runtime, and escalation constraints. Generic Sol/Luna behavior remains centralized here.
+`init-project` creates these entries. The project profile pins the protocol version and adds
+project-specific branch, architecture, verification, runtime, and escalation constraints. Generic
+Sol/Luna behavior remains centralized here.
 
 See [`docs/ADOPTION.md`](docs/ADOPTION.md).
 

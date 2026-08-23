@@ -1,0 +1,7 @@
+interface:
+  display_name: "Codex Auto"
+  short_description: "Run the project-local Sol/Luna development workflow"
+  default_prompt: "Use codex-auto to implement this change in __REPOSITORY__."
+
+policy:
+  allow_implicit_invocation: true

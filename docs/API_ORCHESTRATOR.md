@@ -39,7 +39,8 @@ The MVP uses the following controls:
 - human scope preservation and configured-check allowlisting during contract validation;
 - unified-diff validation before application;
 - allowed/forbidden path policy, with deletions, binaries, and symlinks disabled by default;
-- workflow definitions and `.codex-auto` policy files protected by the default forbidden-path set;
+- workflow definitions, repo-scoped skills, and `.codex-auto` policy files protected by the default
+  forbidden-path set;
 - verification commands supplied only by trusted configuration, never by model output;
 - review identity and acceptance-criterion coverage checks;
 - required local/CI evidence gate before `MERGE_READY`;
@@ -81,6 +82,7 @@ Contract. Each command is an argument vector and is executed without a shell.
 
 ```bash
 uv sync --extra dev
+uv run codex-auto init-project --help
 uv run codex-auto validate \
   --config config/orchestrator.example.yml \
   --task examples/task.example.yml
@@ -94,6 +96,9 @@ OPENAI_API_KEY=... uv run codex-auto run \
 The checkout must be clean and its configured remote must match `github.repository`. The command
 returns exit code `0` only at `MERGE_READY`; bounded or unexpected failures return a structured
 `BLOCKED` result and exit code `2`.
+
+For repository-local installation and automatic discovery inside one ChatGPT/Codex local project,
+see [`PROJECT_LOCAL_INSTALLATION.md`](PROJECT_LOCAL_INSTALLATION.md).
 
 ## Real MVP Limitations
 

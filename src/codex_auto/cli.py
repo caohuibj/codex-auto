@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,7 @@ from codex_auto.config import load_config
 from codex_auto.github import LocalGitHubAdapter
 from codex_auto.models import TaskRequest, TaskState
 from codex_auto.orchestrator import Orchestrator
+from codex_auto.project_init import ProjectInitError, initialize_project
 from codex_auto.responses import OpenAIResponsesClient
 
 
@@ -28,6 +30,26 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="codex-auto")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    init = subparsers.add_parser(
+        "init-project", help="create a repository-local installation and Codex skill"
+    )
+    init.add_argument("--repo-path", required=True, type=Path)
+    init.add_argument("--repository", required=True)
+    init.add_argument("--base-branch", default="main")
+    init.add_argument("--production-branch", default="main")
+    init.add_argument("--sol-model", default="gpt-5.6-sol")
+    init.add_argument("--luna-model", default="gpt-5.6-luna")
+    init.add_argument(
+        "--verification",
+        action="append",
+        default=[],
+        metavar="NAME=COMMAND",
+        help="trusted verification command; repeat for each check",
+    )
+    init.add_argument("--required-ci-check", action="append", default=[])
+    init.add_argument("--max-fix-cycles", type=int, default=2)
+    init.add_argument("--force", action="store_true")
+
     validate = subparsers.add_parser("validate", help="validate config and task files")
     validate.add_argument("--config", required=True, type=Path)
     validate.add_argument("--task", required=True, type=Path)
@@ -41,6 +63,26 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "init-project":
+        try:
+            created = initialize_project(
+                repo_path=args.repo_path,
+                repository=args.repository,
+                base_branch=args.base_branch,
+                production_branch=args.production_branch,
+                sol_model=args.sol_model,
+                luna_model=args.luna_model,
+                verification_specs=args.verification,
+                required_ci_checks=args.required_ci_check,
+                max_fix_cycles=args.max_fix_cycles,
+                force=args.force,
+            )
+        except (ProjectInitError, ValueError) as exc:
+            print(json.dumps({"initialized": False, "error": str(exc)}), file=sys.stderr)
+            return 2
+        print(json.dumps({"initialized": True, "files": [str(path) for path in created]}, indent=2))
+        return 0
+
     config = load_config(args.config)
     task = TaskRequest.model_validate(_load_mapping(args.task))
     if args.command == "validate":

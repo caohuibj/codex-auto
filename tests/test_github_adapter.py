@@ -42,6 +42,7 @@ def test_default_policy_rejects_root_secret_key():
     adapter.config = GitHubConfig(repository="owner/repo")
 
     assert adapter._is_allowed("production.key") is False
+    assert adapter._is_allowed(".agents/skills/codex-auto/SKILL.md") is False
     assert adapter._is_allowed(".github/workflows/ci.yml") is False
     assert adapter._is_allowed(".codex-auto/project.yml") is False
 

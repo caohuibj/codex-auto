@@ -47,6 +47,7 @@ class GitHubConfig(StrictModel):
             ".env",
             ".env.*",
             ".git/**",
+            ".agents/skills/**",
             ".github/workflows/**",
             ".codex-auto/**",
             "*.pem",
