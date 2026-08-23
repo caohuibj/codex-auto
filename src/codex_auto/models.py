@@ -195,7 +195,7 @@ class OrchestrationResult(StrictModel):
     review: ReviewResult | None = None
     fix_cycles: int = 0
     usage: list[UsageRecord] = Field(default_factory=list)
-    estimated_cost_usd: str = "0"
+    estimated_cost_usd: str | None = None
     human_action_required: str | None = None
     blocked_reason: str | None = None
 

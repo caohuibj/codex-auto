@@ -111,7 +111,7 @@ App-native 调用消耗登录账户的 ChatGPT/Codex allowance；达到计划额
 
 - audit 明确记录 `accounting.unavailable`；
 - 结果中的 API token 列表为空；
-- 不把 `0` 美元解释为免费，只表示没有 API 账单估算；
+- `estimated_cost_usd` 返回 `null`，明确表示无法生成 API 账单估算；
 - 用户在 ChatGPT/Codex 的 Usage 页面查看实际 allowance/credits。
 
 这是当前 App 模式的真实限制，不通过抓取本地 OAuth token 或非公开接口绕过。

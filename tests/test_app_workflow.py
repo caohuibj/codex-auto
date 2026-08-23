@@ -41,7 +41,7 @@ def test_app_native_happy_path_uses_no_model_client_and_stops_for_human(tmp_path
     assert result.state == TaskState.MERGE_READY
     assert result.human_action_required is not None
     assert result.usage == []
-    assert result.estimated_cost_usd == "0"
+    assert result.estimated_cost_usd is None
     assert "merge" not in github.calls
     assert store.load().state == TaskState.MERGE_READY
     events = (tmp_path / "audit.jsonl").read_text(encoding="utf-8")

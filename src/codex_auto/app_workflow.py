@@ -254,7 +254,7 @@ class ChatGPTAppWorkflow:
             review=session.review,
             fix_cycles=session.fix_cycles,
             usage=[],
-            estimated_cost_usd="0",
+            estimated_cost_usd=None,
             human_action_required=(
                 "Review repository gates and merge the pull request manually."
                 if session.state == TaskState.MERGE_READY
