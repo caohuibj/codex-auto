@@ -11,14 +11,14 @@ def test_state_machine_accepts_defined_path():
         TaskState.PLANNING,
         TaskState.PLANNED,
         TaskState.IMPLEMENTING,
-        TaskState.PR_OPEN,
+        TaskState.CHANGE_READY,
         TaskState.REVIEWING,
-        TaskState.MERGE_READY,
+        TaskState.INTEGRATION_READY,
     ):
         state.transition(target)
 
-    assert state.state == TaskState.MERGE_READY
-    assert allowed_transitions(TaskState.MERGE_READY) == frozenset()
+    assert state.state == TaskState.INTEGRATION_READY
+    assert allowed_transitions(TaskState.INTEGRATION_READY) == frozenset()
 
 
 def test_state_machine_rejects_skipped_gate():

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import yaml
 
-from codex_auto.config import AppConfig
+from codex_auto.config import AppConfig, GitHubConfig
 
 
 class ProjectInitError(ValueError):
@@ -22,6 +22,19 @@ _GITIGNORE_BLOCK = """# codex-auto project-local runtime
 .codex-auto/audit/
 .codex-auto/tasks/
 .codex-auto/results/
+"""
+
+_AGENTS_BLOCK = """<!-- codex-auto:start -->
+## codex-auto local development workflow
+
+For implementation, fixes, and refactors, use the repository skill at
+`.agents/skills/codex-auto/SKILL.md`. Read `.codex-auto/project.yml` and
+`.codex-auto/orchestrator.yml` before changing code. GitHub is optional: local Git commits, the
+Task Contract, named local verification, recorded change evidence, independent Sol review, and the
+human integration gate are the default source of truth. Do not silently substitute the configured
+Sol or Luna model, bypass a failed/missing check, exceed the bounded fix loop, or integrate/merge
+automatically.
+<!-- codex-auto:end -->
 """
 
 _LAUNCHER = """#!/bin/sh
@@ -84,7 +97,12 @@ def _codex_project_config(sol_model: str, luna_model: str) -> str:
     )
 
 
-def _luna_agent_config(repository: str, luna_model: str) -> str:
+def _luna_agent_config(repository: str, luna_model: str, publish_to_github: bool) -> str:
+    publication_instruction = (
+        "Push/update the configured PR only when the workflow requests publication.\n"
+        if publish_to_github
+        else "Do not push or create any remote change.\n"
+    )
     return (
         'name = "luna_implementer"\n'
         'description = "Bounded implementation and fix worker for the codex-auto workflow."\n'
@@ -93,8 +111,9 @@ def _luna_agent_config(repository: str, luna_model: str) -> str:
         'developer_instructions = """\n'
         f"Work only in {repository} and only on the Task Contract feature branch.\n"
         "Implement or fix only the delegated contract scope, run its named checks, and report "
-        "commit, PR, and verification evidence to the parent Sol task.\n"
-        "Never plan, independently review, merge, change orchestration policy, or edit .codex, "
+        "commit and verification evidence to the parent Sol task. "
+        + publication_instruction
+        + "Never plan, independently review, merge, change orchestration policy, or edit .codex, "
         ".codex-auto, .agents/skills, or .github/workflows.\n"
         "For an explicit configuration probe, make no edits and report the configured model and "
         "agent identity.\n"
@@ -121,10 +140,23 @@ def _append_gitignore(root: Path) -> None:
     path.write_text(existing + separator + prefix + _GITIGNORE_BLOCK, encoding="utf-8")
 
 
+def _append_agents(root: Path) -> Path:
+    path = root / "AGENTS.md"
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    if "<!-- codex-auto:start -->" in existing:
+        return path
+    separator = "" if not existing or existing.endswith("\n") else "\n"
+    prefix = "" if not existing else "\n"
+    path.write_text(existing + separator + prefix + _AGENTS_BLOCK, encoding="utf-8")
+    return path
+
+
 def initialize_project(
     *,
     repo_path: str | Path,
     repository: str,
+    github_repository: str | None = None,
+    remote: str = "origin",
     base_branch: str,
     production_branch: str,
     sol_model: str,
@@ -139,6 +171,8 @@ def initialize_project(
     if not (root / ".git").exists():
         raise ProjectInitError(f"target must be a git repository or worktree: {root}")
     commands = parse_verification_specs(verification_specs)
+    if required_ci_checks and github_repository is None:
+        raise ProjectInitError("required CI checks need an explicit --github-repository")
 
     if execution_mode not in {"chatgpt-app", "responses-api"}:
         raise ProjectInitError("execution_mode must be chatgpt-app or responses-api")
@@ -180,30 +214,42 @@ def initialize_project(
                     "max_output_tokens": 12000,
                 },
             },
-            "github": {
-                "repository": repository,
+            "repository": {
+                "identifier": repository,
                 "base_branch": base_branch,
                 "verification_commands": commands,
-                "required_ci_checks": required_ci_checks,
             },
             "policy": {
                 "max_fix_cycles": max_fix_cycles,
-                "human_merge_required": True,
-                "protocol_version": "v1",
+                "human_integration_required": True,
+                "protocol_version": "v2",
             },
             "audit": {"path": ".codex-auto/audit/{task_id}.jsonl"},
         }
     )
+    if github_repository is not None:
+        config = config.model_copy(
+            update={
+                "github": GitHubConfig(
+                    repository=github_repository,
+                    remote=remote,
+                    required_checks=required_ci_checks,
+                )
+            }
+        )
+        config = AppConfig.model_validate(config.model_dump(mode="json"))
     project_profile = {
-        "protocol": {"repository": "caohuibj/codex-auto", "version": "v1"},
+        "protocol": {"repository": "caohuibj/codex-auto", "version": "v2"},
         "project": {
             "repository": repository,
+            "github_repository": github_repository,
             "integration_branch": base_branch,
             "production_branch": production_branch,
         },
         "workflow": {
             "execution_mode": execution_mode,
-            "human_merge_required": True,
+            "repository_mode": "github" if github_repository else "local-git",
+            "human_integration_required": True,
             "feature_branch_pattern": "codex-auto/*",
             "task_contract_required": True,
             "independent_review_required": True,
@@ -260,7 +306,7 @@ def initialize_project(
                     False,
                 ),
                 root / ".codex/agents/luna-implementer.toml": (
-                    _luna_agent_config(repository, luna_model),
+                    _luna_agent_config(repository, luna_model, github_repository is not None),
                     False,
                 ),
             }
@@ -276,4 +322,5 @@ def initialize_project(
     for path, (content, executable) in managed.items():
         _write_managed(path, content, force=force, executable=executable)
     _append_gitignore(root)
-    return list(managed)
+    agents_path = _append_agents(root)
+    return [*managed, agents_path]

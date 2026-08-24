@@ -7,7 +7,7 @@ description: Use for implementation, bug fixes, or refactors in this repository 
 
 Operate only in `__REPOSITORY__`. Read `.codex-auto/project.yml` and
 `.codex-auto/orchestrator.yml` before acting. Never copy ChatGPT OAuth tokens, request an OpenAI API
-key in `chatgpt-app` mode, install a global runtime, or merge a pull request.
+key in `chatgpt-app` mode, install a global runtime, publish unless configured, or integrate code.
 
 ## ChatGPT App mode (default)
 
@@ -37,20 +37,25 @@ inside the Sol task.
 3. As Sol, inspect the packet and repository, write a PlanProposal YAML matching
    `references/app-workflow.md`, then validate it with `app-accept-plan`.
 4. Run `app-begin-implementation`. Delegate the validated contract and feature branch to exactly one
-   `luna_implementer` subagent. Luna may edit only contract scope, run named checks, commit, push,
-   and open/update the PR. Confirm that the App shows the expected named agent and Luna route before
+   `luna_implementer` subagent. Luna may edit only contract scope, run named checks, and commit the
+   local change. Push/PR work is allowed only when the optional GitHub extension is configured.
+   Confirm that the App shows the expected named agent and Luna route before
    accepting its work. Wait for it to finish; do not implement in the Sol task.
-5. Record the PR with `app-record-pr --pr-number <n>`, then run `app-begin-review`. As Sol, review
-   the actual packet diff, checks, and contract; write a ReviewResult YAML and submit it with
+5. Record the committed branch with `app-record-change`, then run `app-begin-review`. As Sol, review
+   the actual packet diff, local verification, optional remote checks, and contract; submit a
+   ReviewResult YAML with
    `app-submit-review`.
 6. On `CHANGES_REQUESTED`, run `app-begin-fix`. If it returns `FIXING`, delegate only the blocking
-   findings to Luna, then run `app-record-fix --pr-number <n>` and repeat Sol review. Never exceed
+   findings to Luna, then run `app-record-fix` and repeat Sol review. Never exceed
    `max_fix_cycles`; a `BLOCKED` result is terminal.
-7. On `MERGE_READY`, report the PR and evidence, then stop for human merge.
+7. On `INTEGRATION_READY`, report the branch, base/head SHAs, local evidence, and optional remote
+   URL, then stop for human integration. Never merge, rebase, cherry-pick, or push implicitly.
 
 Pass `--packet .codex-auto/results/<task-id>/packet.json` on any checkpoint when a refreshed handoff
-packet is needed. Treat a failed checkpoint, contract, evidence gate, CI check, state transition, or
-human merge gate as authoritative.
+packet is needed. Treat a failed checkpoint, contract, local verification, optional remote check,
+state transition, or human integration gate as authoritative. A required suite that is skipped or
+cannot start must be represented by a command that exits non-zero; an exit-zero summary alone cannot
+prove that an integration environment existed.
 
 Read `references/app-workflow.md` for every checkpoint command and the exact PlanProposal and
 ReviewResult shapes before starting the first App-native workflow.

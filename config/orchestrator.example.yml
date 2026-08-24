@@ -28,10 +28,9 @@ routing:
     reasoning_effort: max
     max_output_tokens: 12000
 
-github:
-  repository: owner/repository
+repository:
+  identifier: local-project
   base_branch: main
-  remote: origin
   feature_branch_prefix: codex-auto/
   context_max_bytes: 120000
   allowed_paths:
@@ -44,6 +43,7 @@ github:
     - ".codex/**"
     - ".github/workflows/**"
     - ".codex-auto/**"
+    - AGENTS.md
     - "*.pem"
     - "*.key"
     - "**/*.pem"
@@ -54,13 +54,18 @@ github:
     format: [uv, run, ruff, format, --check, .]
     typecheck: [uv, run, mypy]
     unit: [uv, run, pytest, -q]
-  required_ci_checks:
-    - quality
+
+# Optional. Remove this entire section for a fully local workflow.
+# github:
+#   repository: owner/repository
+#   remote: origin
+#   required_checks:
+#     - quality
 
 policy:
   max_fix_cycles: 2
-  human_merge_required: true
-  protocol_version: v1
+  human_integration_required: true
+  protocol_version: v2
 
 audit:
   path: .codex-auto/audit/{task_id}.jsonl

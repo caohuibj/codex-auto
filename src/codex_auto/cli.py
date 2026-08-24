@@ -12,11 +12,13 @@ import yaml
 
 from codex_auto.app_workflow import AppSessionStore, ChatGPTAppWorkflow, write_session_packet
 from codex_auto.audit import JsonlAuditLog
-from codex_auto.config import load_config, validate_chatgpt_app_routes
+from codex_auto.config import AppConfig, load_config, validate_chatgpt_app_routes
 from codex_auto.github import LocalGitHubAdapter
 from codex_auto.models import PlanProposal, ReviewResult, TaskRequest, TaskState
 from codex_auto.orchestrator import Orchestrator
+from codex_auto.ports import RepositoryAdapter
 from codex_auto.project_init import ProjectInitError, initialize_project
+from codex_auto.repository import LocalGitAdapter
 from codex_auto.responses import OpenAIResponsesClient
 
 
@@ -27,6 +29,12 @@ def _load_mapping(path: Path) -> dict[str, Any]:
     return raw
 
 
+def _repository_adapter(config: AppConfig, repo_path: Path) -> RepositoryAdapter:
+    if config.github is None:
+        return LocalGitAdapter(repo_path, config.repository)
+    return LocalGitHubAdapter(repo_path, config.repository, config.github)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="codex-auto")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -35,7 +43,9 @@ def build_parser() -> argparse.ArgumentParser:
         "init-project", help="create a repository-local installation and Codex skill"
     )
     init.add_argument("--repo-path", required=True, type=Path)
-    init.add_argument("--repository", required=True)
+    init.add_argument("--repository", required=True, help="local project identifier")
+    init.add_argument("--github-repository", help="optional OWNER/REPO publication target")
+    init.add_argument("--remote", default="origin")
     init.add_argument("--base-branch", default="main")
     init.add_argument("--production-branch", default="main")
     init.add_argument("--sol-model", default="gpt-5.6-sol")
@@ -47,7 +57,12 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="NAME=COMMAND",
         help="trusted verification command; repeat for each check",
     )
-    init.add_argument("--required-ci-check", action="append", default=[])
+    init.add_argument(
+        "--required-ci-check",
+        action="append",
+        default=[],
+        help="optional remote check; valid only with --github-repository",
+    )
     init.add_argument("--max-fix-cycles", type=int, default=2)
     init.add_argument(
         "--execution-mode",
@@ -70,7 +85,7 @@ def build_parser() -> argparse.ArgumentParser:
         "app-start",
         "app-accept-plan",
         "app-begin-implementation",
-        "app-record-pr",
+        "app-record-change",
         "app-begin-review",
         "app-submit-review",
         "app-begin-fix",
@@ -87,8 +102,6 @@ def build_parser() -> argparse.ArgumentParser:
             app.add_argument("--task", required=True, type=Path)
         if command == "app-accept-plan":
             app.add_argument("--plan", required=True, type=Path)
-        if command in {"app-record-pr", "app-record-fix"}:
-            app.add_argument("--pr-number", required=True, type=int)
         if command == "app-submit-review":
             app.add_argument("--review", required=True, type=Path)
     return parser
@@ -106,8 +119,8 @@ def _app_runtime(args: argparse.Namespace) -> tuple[ChatGPTAppWorkflow, AppSessi
     if not audit_path.is_absolute():
         audit_path = args.repo_path.resolve() / audit_path
     audit = JsonlAuditLog(audit_path, task_id, config.audit.max_payload_chars)
-    github = LocalGitHubAdapter(args.repo_path, config.github)
-    return ChatGPTAppWorkflow(config, github, store, audit), store
+    repository = _repository_adapter(config, args.repo_path)
+    return ChatGPTAppWorkflow(config, repository, store, audit), store
 
 
 def _run_app_command(args: argparse.Namespace) -> int:
@@ -118,8 +131,8 @@ def _run_app_command(args: argparse.Namespace) -> int:
         session = workflow.accept_plan(PlanProposal.model_validate(_load_mapping(args.plan)))
     elif args.command == "app-begin-implementation":
         session = workflow.begin_implementation()
-    elif args.command == "app-record-pr":
-        session = workflow.record_pull_request(args.pr_number)
+    elif args.command == "app-record-change":
+        session = workflow.record_change()
     elif args.command == "app-begin-review":
         session = workflow.begin_review()
     elif args.command == "app-submit-review":
@@ -127,7 +140,7 @@ def _run_app_command(args: argparse.Namespace) -> int:
     elif args.command == "app-begin-fix":
         session = workflow.begin_fix()
     elif args.command == "app-record-fix":
-        session = workflow.record_fix(args.pr_number)
+        session = workflow.record_fix()
     else:
         session = store.load()
     if args.packet:
@@ -143,6 +156,8 @@ def main(argv: list[str] | None = None) -> int:
             created = initialize_project(
                 repo_path=args.repo_path,
                 repository=args.repository,
+                github_repository=args.github_repository,
+                remote=args.remote,
                 base_branch=args.base_branch,
                 production_branch=args.production_branch,
                 sol_model=args.sol_model,
@@ -195,10 +210,10 @@ def main(argv: list[str] | None = None) -> int:
     if not audit_path.is_absolute():
         audit_path = args.repo_path.resolve() / audit_path
     audit = JsonlAuditLog(audit_path, task.task_id, config.audit.max_payload_chars)
-    github = LocalGitHubAdapter(args.repo_path, config.github)
-    result = Orchestrator(config, clients, github, audit).run(task)
+    repository = _repository_adapter(config, args.repo_path)
+    result = Orchestrator(config, clients, repository, audit).run(task)
     print(result.model_dump_json(indent=2))
-    return 0 if result.state == TaskState.MERGE_READY else 2
+    return 0 if result.state == TaskState.INTEGRATION_READY else 2
 
 
 if __name__ == "__main__":  # pragma: no cover

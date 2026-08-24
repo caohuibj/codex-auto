@@ -18,11 +18,11 @@ class TaskState(StrEnum):
     PLANNING = "PLANNING"
     PLANNED = "PLANNED"
     IMPLEMENTING = "IMPLEMENTING"
-    PR_OPEN = "PR_OPEN"
+    CHANGE_READY = "CHANGE_READY"
     REVIEWING = "REVIEWING"
     CHANGES_REQUESTED = "CHANGES_REQUESTED"
     FIXING = "FIXING"
-    MERGE_READY = "MERGE_READY"
+    INTEGRATION_READY = "INTEGRATION_READY"
     BLOCKED = "BLOCKED"
 
 
@@ -125,16 +125,21 @@ class CheckEvidence(StrictModel):
     url: str | None = None
 
 
-class PullRequestEvidence(StrictModel):
-    number: int = Field(ge=1)
+class RemoteChangeEvidence(StrictModel):
+    provider: Literal["github"]
+    reference: str
     url: str
+    checks: list[CheckEvidence] = Field(default_factory=list)
+
+
+class ChangeEvidence(StrictModel):
     base_branch: str
     base_sha: str
     head_branch: str
     head_sha: str
     diff: str
-    checks: list[CheckEvidence] = Field(default_factory=list)
     local_verification: list[VerificationResult] = Field(default_factory=list)
+    remote: RemoteChangeEvidence | None = None
 
 
 class CriterionAssessment(StrictModel):
@@ -161,7 +166,16 @@ class ReviewResult(StrictModel):
     head_sha: str
     criteria: list[CriterionAssessment]
     findings: list[ReviewFinding]
-    merge_recommendation: str
+    integration_recommendation: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_recommendation_name(cls, value: object) -> object:
+        if not isinstance(value, dict) or "merge_recommendation" not in value:
+            return value
+        raw = dict(value)
+        raw["integration_recommendation"] = raw.pop("merge_recommendation")
+        return raw
 
     @model_validator(mode="after")
     def decision_matches_findings(self) -> ReviewResult:
@@ -190,8 +204,8 @@ class OrchestrationResult(StrictModel):
     task_id: str
     state: TaskState
     contract: TaskContract | None = None
-    pull_request_url: str | None = None
-    pull_request_number: int | None = None
+    change_reference: str | None = None
+    change_url: str | None = None
     review: ReviewResult | None = None
     fix_cycles: int = 0
     usage: list[UsageRecord] = Field(default_factory=list)
@@ -208,7 +222,7 @@ class AppSession(StrictModel):
     request: TaskRequest
     repository: RepositorySnapshot
     contract: TaskContract | None = None
-    pull_request_evidence: PullRequestEvidence | None = None
+    change_evidence: ChangeEvidence | None = None
     review: ReviewResult | None = None
     feature_branch: str | None = None
     fix_cycles: int = 0

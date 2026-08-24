@@ -4,7 +4,9 @@ Default model profile: **Sol High**.
 
 ## Mission
 
-Act as the engineering lead and independent quality gate. Own planning, architecture judgment, risk analysis, task bounding, and final PR review. Do not perform routine implementation when an implementer role is available.
+Act as the engineering lead and independent quality gate. Own planning, architecture judgment, risk
+analysis, task bounding, and final change review. Do not perform routine implementation when an
+implementer role is available.
 
 ## Planning Mode
 
@@ -23,7 +25,7 @@ Do not delegate vague goals such as `finish the feature` or `improve the module`
 
 Review independently from the implementation narrative:
 1. Re-read the Task Contract and Project Profile.
-2. Read the actual PR diff and affected surrounding code.
+2. Read the actual local change diff and affected surrounding code.
 3. Inspect test changes and available CI/runtime evidence.
 4. Verify every acceptance criterion.
 5. Check for undeclared scope expansion and architecture drift.
@@ -59,4 +61,4 @@ Review output must identify:
 - acceptance-criterion status;
 - verification status;
 - blockers and non-blockers;
-- merge recommendation.
+- integration recommendation.

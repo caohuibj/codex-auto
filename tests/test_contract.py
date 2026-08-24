@@ -4,8 +4,8 @@ from codex_auto.contract import (
     ContractViolation,
     EvidenceGateViolation,
     build_contract,
+    validate_change_identity,
     validate_evidence,
-    validate_pull_request_identity,
     validate_review,
 )
 from codex_auto.models import ReviewDecision, VerificationStatus
@@ -13,8 +13,9 @@ from codex_auto.models import ReviewDecision, VerificationStatus
 from .helpers import (
     BASE_SHA,
     HEAD_ONE,
-    MockGitHubAdapter,
+    MockRepositoryAdapter,
     make_config,
+    make_contract,
     make_plan,
     make_request,
     make_review,
@@ -65,11 +66,10 @@ def test_contract_rejects_dropped_human_scope():
 
 
 def test_review_must_cover_current_head_and_all_criteria():
-    adapter = MockGitHubAdapter()
+    adapter = MockRepositoryAdapter()
     adapter.commit_count = 1
-    evidence = adapter.collect_pull_request_evidence(
-        7,
-        adapter.run_verification(["unit"]),
+    evidence = adapter.collect_change_evidence(
+        "codex-auto/task-001", make_contract(), adapter.run_verification(["unit"])
     )
     wrong_head_review = make_review(ReviewDecision.APPROVED, "d" * 40)
 
@@ -89,9 +89,11 @@ def test_review_must_cover_current_head_and_all_criteria():
 
 
 def test_evidence_gate_requires_passing_contract_verification():
-    adapter = MockGitHubAdapter(VerificationStatus.NOT_RUN)
+    adapter = MockRepositoryAdapter(VerificationStatus.NOT_RUN)
     adapter.commit_count = 1
-    evidence = adapter.collect_pull_request_evidence(7, adapter.run_verification(["unit"]))
+    evidence = adapter.collect_change_evidence(
+        "codex-auto/task-001", make_contract(), adapter.run_verification(["unit"])
+    )
     contract = build_contract(
         make_request(),
         make_plan(),
@@ -107,10 +109,12 @@ def test_evidence_gate_requires_passing_contract_verification():
     assert evidence.head_sha == HEAD_ONE
 
 
-def test_pr_identity_requires_the_task_feature_branch():
-    adapter = MockGitHubAdapter()
+def test_change_identity_requires_the_task_feature_branch():
+    adapter = MockRepositoryAdapter()
     adapter.commit_count = 1
-    evidence = adapter.collect_pull_request_evidence(7, adapter.run_verification(["unit"]))
+    evidence = adapter.collect_change_evidence(
+        "codex-auto/task-001", make_contract(), adapter.run_verification(["unit"])
+    )
     contract = build_contract(
         make_request(),
         make_plan(),
@@ -121,4 +125,4 @@ def test_pr_identity_requires_the_task_feature_branch():
     )
 
     with pytest.raises(EvidenceGateViolation, match="head branch"):
-        validate_pull_request_identity(contract, evidence, "codex-auto/other-task")
+        validate_change_identity(contract, evidence, "codex-auto/other-task")

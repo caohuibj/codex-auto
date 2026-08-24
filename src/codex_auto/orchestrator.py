@@ -12,23 +12,23 @@ from codex_auto.audit import JsonlAuditLog, redact
 from codex_auto.config import AppConfig, ModelRoute
 from codex_auto.contract import (
     build_contract,
+    validate_change_identity,
     validate_evidence,
-    validate_pull_request_identity,
     validate_review,
 )
 from codex_auto.cost import CostLedger
 from codex_auto.models import (
+    ChangeEvidence,
     ImplementationProposal,
     OrchestrationResult,
     PlanProposal,
-    PullRequestEvidence,
     ReviewDecision,
     ReviewResult,
     TaskContract,
     TaskRequest,
     TaskState,
 )
-from codex_auto.ports import GitHubAdapter, ResponsesClient
+from codex_auto.ports import RepositoryAdapter, ResponsesClient
 from codex_auto.prompts import (
     FIX_INSTRUCTIONS,
     IMPLEMENTATION_INSTRUCTIONS,
@@ -45,12 +45,12 @@ class Orchestrator:
         self,
         config: AppConfig,
         clients: Mapping[str, ResponsesClient],
-        github: GitHubAdapter,
+        repository: RepositoryAdapter,
         audit: JsonlAuditLog,
     ) -> None:
         self.config = config
         self.clients = clients
-        self.github = github
+        self.repository = repository
         self.audit = audit
         self.state = TaskStateMachine()
         self.cost = CostLedger(config.cost)
@@ -114,7 +114,7 @@ class Orchestrator:
         request: TaskRequest,
         *,
         contract: TaskContract | None,
-        evidence: PullRequestEvidence | None,
+        evidence: ChangeEvidence | None,
         review: ReviewResult | None,
         fix_cycles: int,
         blocked_reason: str | None = None,
@@ -123,15 +123,21 @@ class Orchestrator:
             task_id=request.task_id,
             state=self.state.state,
             contract=contract,
-            pull_request_url=None if evidence is None else evidence.url,
-            pull_request_number=None if evidence is None else evidence.number,
+            change_reference=(
+                None
+                if evidence is None or evidence.remote is None
+                else evidence.remote.reference
+            ),
+            change_url=(
+                None if evidence is None or evidence.remote is None else evidence.remote.url
+            ),
             review=review,
             fix_cycles=fix_cycles,
             usage=self.cost.records,
             estimated_cost_usd=self.cost.total_usd,
             human_action_required=(
-                "Review repository gates and merge the pull request manually."
-                if self.state.state == TaskState.MERGE_READY
+                "Review the recorded evidence and integrate the feature branch manually."
+                if self.state.state == TaskState.INTEGRATION_READY
                 else None
             ),
             blocked_reason=blocked_reason,
@@ -139,14 +145,14 @@ class Orchestrator:
 
     def run(self, request: TaskRequest) -> OrchestrationResult:
         contract: TaskContract | None = None
-        evidence: PullRequestEvidence | None = None
+        evidence: ChangeEvidence | None = None
         review: ReviewResult | None = None
         fix_cycles = 0
         self.audit.append("task.requested", self.state.state, request.model_dump(mode="json"))
 
         try:
             self._transition(TaskState.PLANNING)
-            snapshot = self.github.snapshot(request.context_paths)
+            snapshot = self.repository.snapshot(request.context_paths)
             self.audit.append(
                 "repository.snapshot",
                 self.state.state,
@@ -166,7 +172,7 @@ class Orchestrator:
                     "request": request.model_dump(mode="json"),
                     "repository": snapshot.model_dump(mode="json"),
                     "configured_verification": sorted(
-                        self.config.github.verification_commands.keys()
+                        self.config.repository.verification_commands.keys()
                     ),
                 },
                 output_type=PlanProposal,
@@ -195,8 +201,10 @@ class Orchestrator:
                 },
             )
 
-            branch = self._branch_name(self.config.github.feature_branch_prefix, request.task_id)
-            self.github.create_feature_branch(branch, contract.base_sha)
+            branch = self._branch_name(
+                self.config.repository.feature_branch_prefix, request.task_id
+            )
+            self.repository.create_feature_branch(branch, contract.base_sha)
             self._transition(TaskState.IMPLEMENTING, branch=branch)
             implementation = self._complete(
                 phase="implementation",
@@ -209,18 +217,22 @@ class Orchestrator:
                 output_type=ImplementationProposal,
                 task_id=request.task_id,
             )
-            paths = self.github.apply_proposal(branch, implementation)
-            verification = self.github.run_verification(contract.verification)
-            head_sha = self.github.commit_and_push(branch, implementation.commit_message, paths)
-            number, url = self.github.open_or_update_pull_request(branch, contract, verification)
-            self.audit.append(
-                "github.pull_request_opened",
-                self.state.state,
-                {"number": number, "url": url, "head_sha": head_sha, "paths": paths},
+            paths = self.repository.apply_proposal(branch, implementation)
+            head_sha = self.repository.commit_change(branch, implementation.commit_message, paths)
+            verification = self.repository.run_verification(contract.verification)
+            local_evidence = self.repository.collect_change_evidence(
+                branch, contract, verification
             )
-            self._transition(TaskState.PR_OPEN, number=number, url=url)
-            evidence = self.github.collect_pull_request_evidence(number, verification)
-            validate_pull_request_identity(contract, evidence, branch)
+            validate_change_identity(contract, local_evidence, branch)
+            self.repository.publish_change(branch, contract, verification)
+            self.audit.append(
+                "change.recorded",
+                self.state.state,
+                {"head_sha": head_sha, "paths": paths, "published": self.config.github is not None},
+            )
+            self._transition(TaskState.CHANGE_READY, head_sha=head_sha)
+            evidence = self.repository.collect_change_evidence(branch, contract, verification)
+            validate_change_identity(contract, evidence, branch)
 
             while True:
                 self._transition(TaskState.REVIEWING, head_sha=evidence.head_sha)
@@ -230,7 +242,7 @@ class Orchestrator:
                     instructions=REVIEW_INSTRUCTIONS,
                     input_data={
                         "contract": contract.model_dump(mode="json"),
-                        "pull_request_evidence": evidence.model_dump(mode="json"),
+                        "change_evidence": evidence.model_dump(mode="json"),
                     },
                     output_type=ReviewResult,
                     task_id=request.task_id,
@@ -251,13 +263,17 @@ class Orchestrator:
                 if review.decision == ReviewDecision.APPROVED:
                     validate_evidence(contract, evidence, self.config, branch)
                     self._transition(
-                        TaskState.MERGE_READY,
-                        human_merge_required=self.config.policy.human_merge_required,
+                        TaskState.INTEGRATION_READY,
+                        human_integration_required=self.config.policy.human_integration_required,
                     )
                     self.audit.append(
-                        "human_merge_gate.reached",
+                        "human_integration_gate.reached",
                         self.state.state,
-                        {"pull_request_url": evidence.url},
+                        {
+                            "change_url": (
+                                None if evidence.remote is None else evidence.remote.url
+                            )
+                        },
                     )
                     return self._result(
                         request,
@@ -268,14 +284,14 @@ class Orchestrator:
                     )
 
                 if review.decision == ReviewDecision.BLOCKED:
-                    self._transition(TaskState.BLOCKED, reason=review.merge_recommendation)
+                    self._transition(TaskState.BLOCKED, reason=review.integration_recommendation)
                     return self._result(
                         request,
                         contract=contract,
                         evidence=evidence,
                         review=review,
                         fix_cycles=fix_cycles,
-                        blocked_reason=review.merge_recommendation,
+                        blocked_reason=review.integration_recommendation,
                     )
 
                 self._transition(TaskState.CHANGES_REQUESTED)
@@ -299,18 +315,23 @@ class Orchestrator:
                     instructions=FIX_INSTRUCTIONS,
                     input_data={
                         "contract": contract.model_dump(mode="json"),
-                        "pull_request_evidence": evidence.model_dump(mode="json"),
+                        "change_evidence": evidence.model_dump(mode="json"),
                         "review": review.model_dump(mode="json"),
                         "fix_cycle": fix_cycles,
                     },
                     output_type=ImplementationProposal,
                     task_id=request.task_id,
                 )
-                paths = self.github.apply_proposal(branch, fix)
-                verification = self.github.run_verification(contract.verification)
-                self.github.commit_and_push(branch, fix.commit_message, paths)
-                evidence = self.github.collect_pull_request_evidence(number, verification)
-                validate_pull_request_identity(contract, evidence, branch)
+                paths = self.repository.apply_proposal(branch, fix)
+                self.repository.commit_change(branch, fix.commit_message, paths)
+                verification = self.repository.run_verification(contract.verification)
+                local_evidence = self.repository.collect_change_evidence(
+                    branch, contract, verification
+                )
+                validate_change_identity(contract, local_evidence, branch)
+                self.repository.publish_change(branch, contract, verification)
+                evidence = self.repository.collect_change_evidence(branch, contract, verification)
+                validate_change_identity(contract, evidence, branch)
                 self.audit.append(
                     "fix.completed",
                     self.state.state,
@@ -319,7 +340,7 @@ class Orchestrator:
 
         except Exception as exc:
             reason = f"{type(exc).__name__}: {exc}"
-            if self.state.state not in {TaskState.BLOCKED, TaskState.MERGE_READY}:
+            if self.state.state not in {TaskState.BLOCKED, TaskState.INTEGRATION_READY}:
                 self._transition(TaskState.BLOCKED, reason=reason)
             self.audit.append("task.blocked", self.state.state, {"reason": reason})
             return self._result(

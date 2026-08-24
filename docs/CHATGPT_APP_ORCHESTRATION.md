@@ -11,8 +11,8 @@ ChatGPT Plus 与 OpenAI API 是不同的认证和计费系统。Plus 不会生�
 effort，implementation/fix 必须直接委派给这个命名 agent。配置漂移、模型不可用、agent 缺失或
 身份无法确认都会停止流程；不允许静默替换模型，也不允许 Sol 代替 Luna 实现。
 
-仓库中的 Python 程序只处理确定性工作：状态转换、Task Contract 校验、分支基线、验证命令、PR
-diff/CI 证据、修复次数、审计日志和人工 merge 门禁。它不会读取或复制 ChatGPT 登录 token，也不会
+仓库中的 Python 程序只处理确定性工作：状态转换、Task Contract 校验、本地分支基线、验证命令、
+diff/检查证据、修复次数、审计日志和人工 integration 门禁。GitHub 是可选发布扩展。程序不会读取或复制 ChatGPT 登录 token，也不会
 把 Codex CLI、SDK 或 App Server 当作隐藏模型后端。
 
 官方说明：Codex 包含在 ChatGPT 计划中，桌面 App 支持并行代理、skills、git 和自动化；API 使用则
@@ -27,15 +27,15 @@ ChatGPT desktop App
 └── Sol primary task
     ├── planning -> PlanProposal
     ├── native delegation -> luna_implementer (exact Luna route)
-    ├── PR/CI evidence -> Sol review
+    ├── local diff/check evidence -> Sol review
     ├── native delegation -> Luna bounded fix (0..N)
-    └── MERGE_READY -> human merge only
+    └── INTEGRATION_READY -> human integration only
 
 repository-local validator
 ├── AppSession JSON
 ├── Task Contract validation
 ├── state transition validation
-├── GitHub evidence collection
+├── Local Git evidence collection
 ├── append-only JSONL audit
 └── no model authentication or model call
 ```
@@ -65,7 +65,7 @@ acceptance_criteria:
 verification:
   - unit
 expected_deliverables:
-  - Implementation and tests in one PR.
+  - Implementation, tests, and local commit evidence.
 escalation_conditions:
   - Stop on an unexpected authentication or public API change.
 ```
@@ -80,13 +80,13 @@ head_sha: 1111111111111111111111111111111111111111
 criteria:
   - criterion_id: AC-01
     status: PASS
-    evidence: The named test and PR diff demonstrate the condition.
+    evidence: The named test and local diff demonstrate the condition.
 findings: []
-merge_recommendation: Ready for human merge after repository gates are confirmed.
+integration_recommendation: Ready for human integration after repository gates are confirmed.
 ```
 
 `base_sha`、`head_sha` 和 criteria 必须来自最新 packet，不能凭摘要填写。`APPROVED` 要求所有
-criteria 为 `PASS`、所有合同验证通过、所有 required CI checks 成功、PR diff 非空且 merge base
+criteria 为 `PASS`、所有合同验证通过、所有本地检查与配置的远程检查成功、diff 非空且 merge base
 仍与合同一致。
 
 ## Checkpoint 顺序
@@ -98,10 +98,10 @@ app-start
   -> app-accept-plan
   -> app-begin-implementation
   -> [App native Luna delegation]
-  -> app-record-pr
+  -> app-record-change
   -> app-begin-review
   -> app-submit-review
-       ├─ MERGE_READY -> stop for human
+       ├─ INTEGRATION_READY -> stop for human
        ├─ BLOCKED -> stop
        └─ CHANGES_REQUESTED
             -> app-begin-fix

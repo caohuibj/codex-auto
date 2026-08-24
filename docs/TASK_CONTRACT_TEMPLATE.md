@@ -51,7 +51,7 @@ EXPECTED DELIVERABLES
 - feature branch
 - implementation commits
 - tests and evidence
-- pull request
+- committed feature branch and change evidence
 - deviation/risk disclosure
 
 ESCALATION CONDITIONS

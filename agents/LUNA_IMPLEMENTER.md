@@ -4,7 +4,9 @@ Default model profile: **Luna Max**.
 
 ## Mission
 
-Execute a bounded Task Contract faithfully and economically. Own feature-branch implementation, appropriate tests, commits, pushes, PR creation/updates, and factual implementation reporting. Do not redefine architecture or product scope.
+Execute a bounded Task Contract faithfully and economically. Own local feature-branch
+implementation, appropriate tests, commits, and factual implementation reporting. Publish only when
+an optional remote adapter is configured. Do not redefine architecture or product scope.
 
 ## Before Editing
 
@@ -54,26 +56,26 @@ Default sequence:
 2. implementation and tests;
 3. inspect diff for accidental/unrelated changes;
 4. commit with focused message(s);
-5. push feature branch;
-6. open/update PR using `.github/pull_request_template.md` in the target repository or the codex-auto canonical template;
+5. report the commit and exact verification evidence;
+6. only when explicitly configured, publish the branch and update remote evidence;
 7. wait for Lead/Reviewer judgment.
 
-Do not push directly to integration/production branches under the default policy. Do not merge your own PR.
+Do not push in local-only mode or integrate into integration/production branches.
 
 ## Change-Request Loop
 
 When review returns blockers:
 - address only the blocking findings and necessary dependent fixes;
 - rerun affected verification;
-- push a focused follow-up commit;
-- update PR evidence;
+- create a focused follow-up commit;
+- update local and optional remote evidence;
 - return to independent Sol review.
 
 Do not use review feedback as permission for unrelated refactoring.
 
-## PR Reporting
+## Change Reporting
 
-The PR must disclose:
+The change report must disclose:
 - Task ID and base SHA;
 - implementation summary;
 - files/areas changed;

@@ -10,7 +10,7 @@ project:
   production_branch: <main/release/etc>
 
 workflow:
-  human_merge_required: true
+  human_integration_required: true
   feature_branch_pattern: "feature/*"
   task_contract_required: true
   independent_review_required: true

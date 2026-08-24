@@ -8,8 +8,8 @@ from pydantic import BaseModel
 
 from codex_auto.config import ModelRoute
 from codex_auto.models import (
+    ChangeEvidence,
     ImplementationProposal,
-    PullRequestEvidence,
     RepositorySnapshot,
     TaskContract,
     UsageRecord,
@@ -37,7 +37,7 @@ class ResponsesClient(Protocol):
     ) -> tuple[OutputT, UsageRecord]: ...
 
 
-class GitHubAdapter(Protocol):
+class RepositoryAdapter(Protocol):
     def snapshot(self, context_paths: list[str]) -> RepositorySnapshot: ...
 
     def create_feature_branch(self, branch: str, base_sha: str) -> None: ...
@@ -46,12 +46,15 @@ class GitHubAdapter(Protocol):
 
     def run_verification(self, names: list[str]) -> list[VerificationResult]: ...
 
-    def commit_and_push(self, branch: str, message: str, paths: list[str]) -> str: ...
+    def commit_change(self, branch: str, message: str, paths: list[str]) -> str: ...
 
-    def open_or_update_pull_request(
+    def publish_change(
         self, branch: str, contract: TaskContract, verification: list[VerificationResult]
-    ) -> tuple[int, str]: ...
+    ) -> None: ...
 
-    def collect_pull_request_evidence(
-        self, number: int, verification: list[VerificationResult]
-    ) -> PullRequestEvidence: ...
+    def collect_change_evidence(
+        self,
+        branch: str,
+        contract: TaskContract,
+        verification: list[VerificationResult],
+    ) -> ChangeEvidence: ...

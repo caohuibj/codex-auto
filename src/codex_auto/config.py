@@ -44,10 +44,11 @@ class RoutingConfig(StrictModel):
     fix: ModelRoute
 
 
-class GitHubConfig(StrictModel):
-    repository: str = Field(pattern=r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+class RepositoryConfig(StrictModel):
+    """Local repository policy. The core never requires a network remote."""
+
+    identifier: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.\/-]{0,127}$")
     base_branch: str = "main"
-    remote: str = "origin"
     feature_branch_prefix: str = "codex-auto/"
     context_max_bytes: int = Field(default=120_000, ge=1_000, le=2_000_000)
     allowed_paths: list[str] = Field(default_factory=lambda: ["**"])
@@ -60,6 +61,7 @@ class GitHubConfig(StrictModel):
             ".codex/**",
             ".github/workflows/**",
             ".codex-auto/**",
+            "AGENTS.md",
             "*.pem",
             "*.key",
             "**/*.pem",
@@ -68,13 +70,29 @@ class GitHubConfig(StrictModel):
     )
     allow_deletions: bool = False
     verification_commands: dict[str, list[str]] = Field(default_factory=dict)
-    required_ci_checks: list[str] = Field(default_factory=list)
+
+
+class GitHubConfig(StrictModel):
+    """Optional publication/evidence extension for repositories hosted on GitHub."""
+
+    repository: str = Field(pattern=r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+    remote: str = "origin"
+    required_checks: list[str] = Field(default_factory=list)
 
 
 class PolicyConfig(StrictModel):
     max_fix_cycles: int = Field(default=2, ge=0, le=10)
-    human_merge_required: Literal[True] = True
-    protocol_version: str = "v1"
+    human_integration_required: Literal[True] = True
+    protocol_version: str = "v2"
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_human_gate_name(cls, value: object) -> object:
+        if not isinstance(value, dict) or "human_merge_required" not in value:
+            return value
+        raw = dict(value)
+        raw["human_integration_required"] = raw.pop("human_merge_required")
+        return raw
 
 
 class AuditConfig(StrictModel):
@@ -106,10 +124,42 @@ class CostConfig(StrictModel):
 class AppConfig(StrictModel):
     providers: dict[str, ProviderConfig]
     routing: RoutingConfig
-    github: GitHubConfig
+    repository: RepositoryConfig
+    github: GitHubConfig | None = None
     policy: PolicyConfig = Field(default_factory=PolicyConfig)
     audit: AuditConfig = Field(default_factory=AuditConfig)
     cost: CostConfig = Field(default_factory=CostConfig)
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_v1_github_config(cls, value: object) -> object:
+        """Load v1 GitHub-first files while all newly generated files use v2."""
+
+        if not isinstance(value, dict) or "repository" in value or "github" not in value:
+            return value
+        raw = dict(value)
+        legacy = raw.get("github")
+        if not isinstance(legacy, dict):
+            return value
+        legacy = dict(legacy)
+        raw["repository"] = {
+            "identifier": legacy["repository"],
+            "base_branch": legacy.get("base_branch", "main"),
+            "feature_branch_prefix": legacy.get("feature_branch_prefix", "codex-auto/"),
+            "context_max_bytes": legacy.get("context_max_bytes", 120_000),
+            "allowed_paths": legacy.get("allowed_paths", ["**"]),
+            "forbidden_paths": legacy.get(
+                "forbidden_paths", RepositoryConfig(identifier="legacy").forbidden_paths
+            ),
+            "allow_deletions": legacy.get("allow_deletions", False),
+            "verification_commands": legacy.get("verification_commands", {}),
+        }
+        raw["github"] = {
+            "repository": legacy["repository"],
+            "remote": legacy.get("remote", "origin"),
+            "required_checks": legacy.get("required_ci_checks", []),
+        }
+        return raw
 
     @model_validator(mode="after")
     def routes_reference_known_providers(self) -> AppConfig:
