@@ -13,16 +13,16 @@ _ALLOWED: dict[TaskState, set[TaskState]] = {
     TaskState.REQUESTED: {TaskState.PLANNING, TaskState.BLOCKED},
     TaskState.PLANNING: {TaskState.PLANNED, TaskState.BLOCKED},
     TaskState.PLANNED: {TaskState.IMPLEMENTING, TaskState.BLOCKED},
-    TaskState.IMPLEMENTING: {TaskState.PR_OPEN, TaskState.BLOCKED},
-    TaskState.PR_OPEN: {TaskState.REVIEWING, TaskState.BLOCKED},
+    TaskState.IMPLEMENTING: {TaskState.CHANGE_READY, TaskState.BLOCKED},
+    TaskState.CHANGE_READY: {TaskState.REVIEWING, TaskState.BLOCKED},
     TaskState.REVIEWING: {
-        TaskState.MERGE_READY,
+        TaskState.INTEGRATION_READY,
         TaskState.CHANGES_REQUESTED,
         TaskState.BLOCKED,
     },
     TaskState.CHANGES_REQUESTED: {TaskState.FIXING, TaskState.BLOCKED},
     TaskState.FIXING: {TaskState.REVIEWING, TaskState.BLOCKED},
-    TaskState.MERGE_READY: set(),
+    TaskState.INTEGRATION_READY: set(),
     TaskState.BLOCKED: set(),
 }
 

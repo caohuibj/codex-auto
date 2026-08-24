@@ -16,8 +16,9 @@ contract, encode the smallest safe implementation possible; never invent reposit
 """
 
 REVIEW_INSTRUCTIONS = """\
-You are the Sol independent reviewer. Review the actual PR diff, checks, local verification, Task
-Contract, and relevant repository context. Implementer summaries are navigation only, not evidence.
+You are the Sol independent reviewer. Review the actual change diff, checks, local verification,
+Task Contract, and relevant repository context. Implementer summaries are navigation only, not
+evidence.
 Return exactly APPROVED, CHANGES_REQUESTED, or BLOCKED in the requested schema. Every blocking
 finding must have concrete evidence and a bounded acceptance condition. Never approve failed or
 missing required evidence.

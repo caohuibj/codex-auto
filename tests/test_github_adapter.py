@@ -1,13 +1,13 @@
 import pytest
 
-from codex_auto.config import GitHubConfig
-from codex_auto.github import GitHubAdapterError, LocalGitHubAdapter
+from codex_auto.config import RepositoryConfig
+from codex_auto.repository import LocalGitAdapter, RepositoryAdapterError
 
 
 def make_adapter(*, allow_deletions=False):
-    adapter = object.__new__(LocalGitHubAdapter)
-    adapter.config = GitHubConfig(
-        repository="owner/repo",
+    adapter = object.__new__(LocalGitAdapter)
+    adapter.config = RepositoryConfig(
+        identifier="owner/repo",
         allowed_paths=["src/**"],
         forbidden_paths=["src/secrets/**"],
         allow_deletions=allow_deletions,
@@ -33,13 +33,13 @@ def test_patch_policy_rejects_forbidden_path():
         "+++ b/src/secrets/key.py\n"
     )
 
-    with pytest.raises(GitHubAdapterError, match="not allowed"):
+    with pytest.raises(RepositoryAdapterError, match="not allowed"):
         make_adapter()._paths_from_patch(patch)
 
 
 def test_default_policy_rejects_root_secret_key():
-    adapter = object.__new__(LocalGitHubAdapter)
-    adapter.config = GitHubConfig(repository="owner/repo")
+    adapter = object.__new__(LocalGitAdapter)
+    adapter.config = RepositoryConfig(identifier="owner/repo")
 
     assert adapter._is_allowed("production.key") is False
     assert adapter._is_allowed(".agents/skills/codex-auto/SKILL.md") is False
@@ -51,7 +51,7 @@ def test_default_policy_rejects_root_secret_key():
 def test_patch_policy_rejects_deletion_by_default():
     patch = "diff --git a/src/app.py b/src/app.py\n--- a/src/app.py\n+++ /dev/null\n"
 
-    with pytest.raises(GitHubAdapterError, match="deletion is disabled"):
+    with pytest.raises(RepositoryAdapterError, match="deletion is disabled"):
         make_adapter()._paths_from_patch(patch)
 
 
@@ -62,7 +62,7 @@ def test_patch_policy_rejects_deletion_header_with_timestamp():
         "+++ /dev/null\t2026-08-24 10:00:00\n"
     )
 
-    with pytest.raises(GitHubAdapterError, match="deletion is disabled"):
+    with pytest.raises(RepositoryAdapterError, match="deletion is disabled"):
         make_adapter()._paths_from_patch(patch)
 
 
@@ -77,12 +77,12 @@ def test_patch_policy_validates_every_unified_diff_header_before_apply():
         "@@ -1 +1 @@\n-old\n+new\n"
     )
 
-    with pytest.raises(GitHubAdapterError, match="not allowed"):
+    with pytest.raises(RepositoryAdapterError, match="not allowed"):
         make_adapter()._paths_from_patch(patch)
 
 
 def test_patch_policy_rejects_symlinks_and_binary_patches():
-    with pytest.raises(GitHubAdapterError, match="symbolic-link"):
+    with pytest.raises(RepositoryAdapterError, match="symbolic-link"):
         make_adapter()._paths_from_patch("diff --git a/src/link b/src/link\nnew file mode 120000\n")
-    with pytest.raises(GitHubAdapterError, match="binary"):
+    with pytest.raises(RepositoryAdapterError, match="binary"):
         make_adapter()._paths_from_patch("diff --git a/src/a.bin b/src/a.bin\nGIT binary patch\n")

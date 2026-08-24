@@ -2,7 +2,9 @@
 
 Reusable AI-assisted software engineering governance and orchestration protocol.
 
-`codex-auto` defines a project-agnostic workflow in which a lead/reviewer agent plans and verifies work, an implementation agent executes bounded tasks, GitHub records the durable shared state, CI provides machine-verifiable evidence, and a human retains merge authority.
+`codex-auto` defines a project-agnostic workflow in which a lead/reviewer agent plans and verifies
+work, an implementation agent executes bounded tasks, local Git and project-owned checks record the
+evidence, and a human retains integration authority. GitHub publication and CI evidence are optional.
 
 ## Default Roles
 
@@ -16,11 +18,11 @@ Sol High — Lead / Architect
         v
 Luna Max — Implementer
         |
-        | feature branch + tests + PR
+        | local feature branch + commit + checks
         v
 Sol High — Independent Reviewer
         |
-        +--> APPROVED ----------> Human Merge
+        +--> APPROVED ----------> Human Integration
         |
         +--> CHANGES_REQUESTED -> Luna -> Sol Review
         |
@@ -36,8 +38,8 @@ planning/review, bounded execution for implementation, and repository evidence f
 
 For users signed in to the ChatGPT desktop App, `codex-auto` now uses the App itself as the model
 runtime. Sol remains the primary planning/review task and delegates implementation/fixes to native
-Luna subagents. Repository-local checkpoints validate every state transition, Task Contract, PR/CI
-evidence, bounded fix cycle, and human merge gate. They do not call the OpenAI API, copy ChatGPT
+Luna subagents. Repository-local checkpoints validate every state transition, Task Contract, local
+Git/check evidence, bounded fix cycle, and human integration gate. They do not call the OpenAI API, copy ChatGPT
 credentials, or invoke Codex CLI as a model backend.
 
 ChatGPT subscriptions and API billing are separate. A Plus subscription can run this App-native
@@ -52,8 +54,8 @@ follow the standalone Chinese walkthrough
 
 The repository also includes a minimal Python service that executes this protocol with configurable
 Sol/Luna routes over the OpenAI Responses API. It validates a model-generated Task Contract, applies
-bounded implementation/fix patches on a feature branch, opens a GitHub PR, collects actual diff/CI
-evidence, independently reviews it, and stops at a human merge gate.
+bounded implementation/fix patches on a local feature branch, collects actual diff/check evidence,
+independently reviews it, and stops at a human integration gate. GitHub is an opt-in extension.
 
 ```bash
 uv sync --extra api --extra dev
@@ -73,6 +75,7 @@ command creates a repo-scoped `.agents/skills/codex-auto` entry and project-loca
 ## Core Files
 
 - [`docs/AI_DEVELOPMENT_PROTOCOL.md`](docs/AI_DEVELOPMENT_PROTOCOL.md) — governance, state machine, evidence and escalation rules.
+- [`docs/LOCAL_GIT_FIRST_ARCHITECTURE.md`](docs/LOCAL_GIT_FIRST_ARCHITECTURE.md) — GitHub-free default architecture, trust boundaries, evidence, and limitations.
 - [`docs/TASK_CONTRACT_TEMPLATE.md`](docs/TASK_CONTRACT_TEMPLATE.md) — Lead-to-Implementer handoff contract.
 - [`docs/PR_REVIEW_PROTOCOL.md`](docs/PR_REVIEW_PROTOCOL.md) — independent five-level review and decision states.
 - [`docs/PROJECT_PROFILE_TEMPLATE.md`](docs/PROJECT_PROFILE_TEMPLATE.md) — project-specific constraints without forking the protocol.
@@ -105,7 +108,7 @@ See [`docs/ADOPTION.md`](docs/ADOPTION.md).
 
 ## Principles
 
-- GitHub is the durable source of truth; model memory is not.
+- Local Git commits and recorded evidence are the default durable source of truth; model memory is not.
 - Planning and review are independent from implementation.
 - Every implementation starts from a bounded, testable Task Contract.
 - The reviewer reads the actual diff and evidence rather than trusting completion summaries.

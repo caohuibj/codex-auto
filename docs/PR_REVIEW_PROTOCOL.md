@@ -1,6 +1,6 @@
 # Pull Request Review Protocol
 
-The reviewer must verify the actual repository state and PR changes independently. Implementer summaries are useful navigation aids, not evidence.
+The reviewer must verify the actual repository state and recorded change independently. Implementer summaries are useful navigation aids, not evidence.
 
 ## Review Order
 
@@ -74,7 +74,7 @@ Required decision or missing capability:
 ## Review Discipline
 
 - Do not approve based on confidence language such as `looks fine`.
-- Do not fail a PR solely for optional style preferences.
+- Do not fail a change solely for optional style preferences.
 - Do not require unrelated refactors as a condition of approval.
 - Do not infer passing runtime or regression tests from successful compilation.
 - Re-review changed files and affected tests after each fix cycle.

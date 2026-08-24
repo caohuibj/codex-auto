@@ -26,7 +26,7 @@ def init(root: Path, *, force: bool = False) -> list[Path]:
             "lint=uv run ruff check .",
             "unit=uv run pytest -q",
         ],
-        required_ci_checks=["quality"],
+        required_ci_checks=[],
         max_fix_cycles=2,
         force=force,
     )
@@ -51,13 +51,15 @@ def test_initialize_project_creates_repo_scoped_runtime_and_skill(tmp_path):
     created = init(root)
     config = load_config(root / ".codex-auto/orchestrator.yml")
 
-    assert len(created) == 9
-    assert config.github.repository == "owner/example"
-    assert config.github.base_branch == "dev"
-    assert config.github.verification_commands["unit"] == ["uv", "run", "pytest", "-q"]
-    assert config.github.required_ci_checks == ["quality"]
-    assert ".agents/skills/**" in config.github.forbidden_paths
-    assert ".codex/**" in config.github.forbidden_paths
+    assert len(created) == 10
+    assert config.repository.identifier == "owner/example"
+    assert config.repository.base_branch == "dev"
+    assert config.repository.verification_commands["unit"] == ["uv", "run", "pytest", "-q"]
+    assert config.github is None
+    assert ".agents/skills/**" in config.repository.forbidden_paths
+    assert ".codex/**" in config.repository.forbidden_paths
+    assert "AGENTS.md" in config.repository.forbidden_paths
+    assert config.policy.human_integration_required is True
     assert config.routing.planning.model == "sol-model"
     assert config.routing.implementation.model == "luna-model"
     assert config.providers["chatgpt_app"].type == "chatgpt_app"
@@ -84,6 +86,33 @@ def test_initialize_project_creates_repo_scoped_runtime_and_skill(tmp_path):
     assert ".codex-auto/.env" in gitignore
     assert "$HOME" not in "\n".join(str(path) for path in created)
     assert "No OpenAI API key" in (root / ".codex-auto/.env.example").read_text(encoding="utf-8")
+    agents = (root / "AGENTS.md").read_text(encoding="utf-8")
+    assert "GitHub is optional" in agents
+    assert "human integration gate" in agents
+
+
+def test_initialize_project_can_opt_in_to_github_publication(tmp_path):
+    root = make_repo(tmp_path)
+
+    initialize_project(
+        repo_path=root,
+        repository="example-local",
+        github_repository="owner/example",
+        remote="upstream",
+        base_branch="main",
+        production_branch="main",
+        sol_model="sol-model",
+        luna_model="luna-model",
+        verification_specs=["unit=python -m pytest -q"],
+        required_ci_checks=["quality"],
+        max_fix_cycles=1,
+    )
+
+    config = load_config(root / ".codex-auto/orchestrator.yml")
+    assert config.github is not None
+    assert config.github.repository == "owner/example"
+    assert config.github.remote == "upstream"
+    assert config.github.required_checks == ["quality"]
 
 
 def test_initialize_project_can_explicitly_select_responses_api(tmp_path):
@@ -140,6 +169,39 @@ def test_initialize_project_is_idempotent_and_does_not_duplicate_gitignore(tmp_p
 
     gitignore = (root / ".gitignore").read_text(encoding="utf-8")
     assert gitignore.count("# codex-auto project-local runtime") == 1
+    agents = (root / "AGENTS.md").read_text(encoding="utf-8")
+    assert agents.count("<!-- codex-auto:start -->") == 1
+
+
+def test_initialize_project_preserves_existing_agents_rules(tmp_path):
+    root = make_repo(tmp_path)
+    (root / "AGENTS.md").write_text(
+        "# Existing rules\n\nDo not change billing.\n", encoding="utf-8"
+    )
+
+    init(root)
+
+    agents = (root / "AGENTS.md").read_text(encoding="utf-8")
+    assert agents.startswith("# Existing rules\n")
+    assert "Do not change billing." in agents
+    assert "<!-- codex-auto:start -->" in agents
+
+
+def test_required_remote_checks_require_explicit_github_mode(tmp_path):
+    root = make_repo(tmp_path)
+
+    with pytest.raises(ProjectInitError, match="explicit --github-repository"):
+        initialize_project(
+            repo_path=root,
+            repository="local-only",
+            base_branch="main",
+            production_branch="main",
+            sol_model="sol-model",
+            luna_model="luna-model",
+            verification_specs=["unit=python -m pytest -q"],
+            required_ci_checks=["quality"],
+            max_fix_cycles=1,
+        )
 
 
 def test_initialize_project_requires_force_for_managed_changes(tmp_path):

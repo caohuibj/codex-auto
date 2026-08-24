@@ -87,13 +87,12 @@ Contract allowlist，模型不能自行增加任意命令。
 ```bash
 .codex-auto/runtime/bin/codex-auto init-project \
   --repo-path . \
-  --repository owner/repository \
+  --repository local-project-id \
   --base-branch main \
   --production-branch main \
   --verification "lint=uv run ruff check ." \
   --verification "typecheck=uv run mypy" \
   --verification "unit=uv run pytest -q" \
-  --required-ci-check quality \
   --max-fix-cycles 2 \
   --execution-mode chatgpt-app
 ```
@@ -181,11 +180,11 @@ review-only、解释性问题和明确要求 direct manual editing 的任务不�
 - Codex：`$codex-auto 实现……`
 - ChatGPT 中能看到该 standalone skill 时：`@codex-auto 实现……`
 
-实际修改本地代码、运行 Git 和创建 PR 时仍应使用这个 local project 中的 Codex task；在普通
+实际修改本地代码和运行 Git 时仍应使用这个 local project 中的 Codex task；在普通
 ChatGPT Chat/Work 中选择 skill 本身不会额外授予本地文件或 terminal 权限。
 
 skill 会创建项目内 TaskRequest，并通过 `app-*` checkpoint 驱动持久状态。模型工作仍由当前 App
-中的 Sol 主任务和 App 原生 Luna 子代理完成；checkpoint 只做校验、GitHub 取证和审计，不调用 CLI
+中的 Sol 主任务和 App 原生 Luna 子代理完成；checkpoint 只做校验、本地 Git 取证和审计，不调用 CLI
 模型客户端、SDK 或 Responses API。典型开头为：
 
 ```bash
@@ -196,7 +195,8 @@ skill 会创建项目内 TaskRequest，并通过 `app-*` checkpoint 驱动持久
   --packet .codex-auto/results/<task-id>/packet.json
 ```
 
-最终停在 GitHub PR 的 human merge gate，不会 merge。
+最终停在本地 `INTEGRATION_READY` human integration gate，不会 merge、push 或创建 PR；只有
+显式配置 GitHub 扩展时才发布远程变更。
 
 App 模式下，初始化器还会把主任务默认路由写入 `.codex/config.toml`，并创建项目 agent
 `luna_implementer`。开始前必须在 App 输入框下方确认实际选择的是配置中的 Sol/effort；实现与修复
@@ -239,9 +239,9 @@ uv pip install --upgrade \
 
 - 项目 launcher 当前面向 macOS/Linux；Windows 可直接调用
   `.codex-auto\\runtime\\Scripts\\codex-auto.exe`。
-- 普通、非 local 的 ChatGPT project 不能运行本地 Git/GitHub adapter；应使用带 primary folder 的
+- 普通、非 local 的 ChatGPT project 不能运行本地 Git adapter；应使用带 primary folder 的
   local project/Codex task。
-- 初始化不会替你选择正确的验证命令或 CI check name；这些必须与目标仓库真实命令一致。
-- App 模式的 branch、push 和 PR 创建仍受项目 credentials、sandbox 和网络权限约束。
+- 初始化不会替你选择正确的验证命令；这些必须与目标仓库真实命令一致。
+- 本地 branch/commit 仍受项目 sandbox 权限约束；只有显式 GitHub 模式才需要网络、remote 和 `gh`。
 - App 没有向 repo-local helper 暴露逐阶段精确 token/美元数据；实际 allowance/credits 在 ChatGPT
   Usage 页面查看，audit 会明确标记 accounting unavailable。

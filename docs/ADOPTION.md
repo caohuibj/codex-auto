@@ -2,7 +2,7 @@
 
 `codex-auto` remains the canonical home of generic agent roles, task contracts, review rules, and
 runtime implementation. Target repositories keep a generated repo-scoped skill, a thin launcher,
-project-specific configuration, and optionally thin GitHub templates/workflows.
+project-specific configuration, and optionally a GitHub publication extension.
 
 ## Recommended Consumer Layout
 
@@ -23,6 +23,8 @@ In the target repository:
 ├── orchestrator.yml
 ├── .env.example
 └── runtime/               # ignored project-local environment
+
+AGENTS.md                  # managed routing block; existing content is preserved
 ```
 
 This layout is created by `codex-auto init-project`. The repo-scoped skill makes the workflow
@@ -39,15 +41,15 @@ ChatGPT desktop local-project setup, invocation, update, and removal instruction
 ```yaml
 protocol:
   repository: caohuibj/codex-auto
-  version: v1
+  version: v2
 
 project:
-  repository: owner/project
+  repository: local-project-id
   integration_branch: dev
   production_branch: main
 
 workflow:
-  human_merge_required: true
+  human_integration_required: true
   feature_branch_pattern: "feature/*"
 
 architecture:
@@ -94,13 +96,15 @@ Sol reads:
 Sol then creates a bounded Task Contract.
 
 ### 3. Luna Implementation
-Luna reads the same project profile and Task Contract, creates a feature branch, implements, tests, pushes, and opens a PR.
+Luna reads the same project profile and Task Contract, creates a local feature branch, implements,
+tests, and commits. It pushes/opens a PR only when the optional GitHub extension is configured.
 
 ### 4. Sol Independent Review
-Sol re-reads the actual PR/diff/tests/CI and returns `APPROVED`, `CHANGES_REQUESTED`, or `BLOCKED`.
+Sol re-reads the actual local diff/check evidence and optional remote evidence, then returns
+`APPROVED`, `CHANGES_REQUESTED`, or `BLOCKED`.
 
 ### 5. Human Merge
-The human merges only after required repository gates are satisfied.
+The human chooses how to integrate only after required repository gates are satisfied.
 
 ## Protocol Versioning
 

@@ -10,12 +10,11 @@ from codex_auto.audit import JsonlAuditLog
 from codex_auto.config import AppConfig
 from codex_auto.models import (
     AcceptanceCriterion,
-    CheckEvidence,
+    ChangeEvidence,
     CriterionAssessment,
     FileSnapshot,
     ImplementationProposal,
     PlanProposal,
-    PullRequestEvidence,
     RepositorySnapshot,
     ReviewDecision,
     ReviewFinding,
@@ -42,12 +41,12 @@ def make_config(max_fix_cycles: int = 2) -> AppConfig:
                 "review": {"model": "sol-model"},
                 "fix": {"model": "luna-model"},
             },
-            "github": {
-                "repository": "owner/repo",
+            "repository": {
+                "identifier": "owner/repo",
                 "base_branch": "main",
                 "verification_commands": {"unit": ["pytest", "-q"]},
             },
-            "policy": {"max_fix_cycles": max_fix_cycles, "human_merge_required": True},
+            "policy": {"max_fix_cycles": max_fix_cycles, "human_integration_required": True},
             "cost": {
                 "models": {
                     "sol-model": {
@@ -101,7 +100,7 @@ def make_plan() -> PlanProposal:
             )
         ],
         verification=["unit"],
-        expected_deliverables=["Feature branch and pull request"],
+        expected_deliverables=["Feature branch and local evidence"],
         escalation_conditions=["Repository contradicts the contract"],
     )
 
@@ -113,7 +112,7 @@ def make_contract() -> TaskContract:
         target_repository="owner/repo",
         base_branch="main",
         base_sha=BASE_SHA,
-        protocol_version="v1",
+        protocol_version="v2",
         **make_plan().model_dump(),
     )
 
@@ -138,7 +137,7 @@ def make_review(decision: ReviewDecision, head_sha: str) -> ReviewResult:
     if decision == ReviewDecision.APPROVED:
         findings: list[ReviewFinding] = []
         status = "PASS"
-        recommendation = "Ready for human merge."
+        recommendation = "Ready for human integration."
     elif decision == ReviewDecision.CHANGES_REQUESTED:
         findings = [
             ReviewFinding(
@@ -147,7 +146,7 @@ def make_review(decision: ReviewDecision, head_sha: str) -> ReviewResult:
                 criterion_id="AC-01",
                 location="src/feature.py",
                 issue="Expected edge case is missing",
-                evidence="The PR diff has no edge-case branch",
+                evidence="The change diff has no edge-case branch",
                 required_change="Handle the edge case",
                 acceptance_condition="Unit test covers the edge case",
             )
@@ -169,7 +168,7 @@ def make_review(decision: ReviewDecision, head_sha: str) -> ReviewResult:
             )
         ],
         findings=findings,
-        merge_recommendation=recommendation,
+        integration_recommendation=recommendation,
     )
 
 
@@ -203,7 +202,7 @@ class MockResponsesClient:
         )
 
 
-class MockGitHubAdapter:
+class MockRepositoryAdapter:
     def __init__(self, verification_status: VerificationStatus = VerificationStatus.PASS) -> None:
         self.verification_status = verification_status
         self.commit_count = 0
@@ -244,33 +243,32 @@ class MockGitHubAdapter:
             )
         ]
 
-    def commit_and_push(self, branch: str, message: str, paths: list[str]) -> str:
-        self.calls.append("commit_push")
+    def commit_change(self, branch: str, message: str, paths: list[str]) -> str:
+        self.calls.append("commit")
         self.commit_count += 1
         return HEAD_ONE if self.commit_count == 1 else HEAD_TWO
 
-    def open_or_update_pull_request(
+    def publish_change(
         self,
         branch: str,
         contract: TaskContract,
         verification: list[VerificationResult],
-    ) -> tuple[int, str]:
-        self.calls.append("open_pr")
-        return 7, "https://github.com/owner/repo/pull/7"
+    ) -> None:
+        self.calls.append("publish")
 
-    def collect_pull_request_evidence(
-        self, number: int, verification: list[VerificationResult]
-    ) -> PullRequestEvidence:
+    def collect_change_evidence(
+        self,
+        branch: str,
+        contract: TaskContract,
+        verification: list[VerificationResult],
+    ) -> ChangeEvidence:
         self.calls.append("collect_evidence")
-        return PullRequestEvidence(
-            number=number,
-            url="https://github.com/owner/repo/pull/7",
+        return ChangeEvidence(
             base_branch="main",
             base_sha=BASE_SHA,
             head_branch=self.branch or "codex-auto/task-001",
             head_sha=HEAD_ONE if self.commit_count <= 1 else HEAD_TWO,
             diff="diff --git a/src/feature.py b/src/feature.py\n+NEW = 2\n",
-            checks=[CheckEvidence(name="ci", status="completed", conclusion="success")],
             local_verification=verification,
         )
 

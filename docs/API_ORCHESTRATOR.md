@@ -3,8 +3,9 @@
 ## Objective
 
 The service turns the governance protocol into an executable, fail-closed workflow. Sol performs
-planning and independent review. Luna produces bounded implementation and fix patches. Git and
-GitHub own branches, commits, pull requests, checks, and review evidence. A human always owns merge.
+planning and independent review. Luna produces bounded implementation and fix patches. Local Git
+owns branches, commits, diffs, and local verification evidence. GitHub may optionally add
+publication and remote checks. A human always owns integration.
 
 The names Sol and Luna describe configured routes, not hard-coded providers. Provider and model IDs
 are runtime configuration.
@@ -18,10 +19,10 @@ TaskRequest
   -> trusted TaskContract construction + validation
   -> feature branch from contract base
   -> Luna ImplementationProposal (unified diff)
-  -> patch policy gate -> configured verification -> commit/push -> PR
-  -> collect actual PR diff, head SHA, local results, and CI checks
+  -> patch policy gate -> local commit -> configured verification
+  -> collect actual local diff, head SHA, and local results (+ optional remote checks)
   -> Sol ReviewResult (strict JSON schema)
-       APPROVED -> deterministic evidence gate -> MERGE_READY -> stop for human
+       APPROVED -> deterministic evidence gate -> INTEGRATION_READY -> stop for human
        CHANGES_REQUESTED -> Luna bounded fix -> re-verify -> re-review
        BLOCKED -> stop with evidence
   -> max_fix_cycles reached -> BLOCKED
@@ -43,39 +44,41 @@ The MVP uses the following controls:
   forbidden-path set;
 - verification commands supplied only by trusted configuration, never by model output;
 - review identity and acceptance-criterion coverage checks;
-- required local/CI evidence gate before `MERGE_READY`;
+- required local and optional remote evidence gate before `INTEGRATION_READY`;
 - an append-only, redacted JSONL audit trail;
-- no merge method in the GitHub adapter and a required human merge policy.
+- no merge/integration method in the repository adapter and a required human gate.
 
 ## Components
 
 | Component | Responsibility |
 |---|---|
-| `config.py` | Provider/model routes, GitHub policy, fix bound, audit, pricing hooks |
+| `config.py` | Provider/model routes, local repository policy, optional GitHub, fix bound, audit, pricing hooks |
 | `models.py` | Strict contracts for every model and adapter boundary |
 | `state.py` | Allowed workflow transitions |
 | `responses.py` | OpenAI Responses API adapter with strict structured outputs and usage capture |
-| `github.py` | Local Git + `gh` adapter for snapshot, branch, patch, commit, PR, and evidence |
+| `repository.py` | Local Git adapter for snapshot, branch, patch, commit, checks, and evidence |
+| `github.py` | Optional `gh` publication and remote-check extension |
 | `contract.py` | Trusted Task Contract construction and deterministic evidence/review gates |
 | `orchestrator.py` | End-to-end control loop and human stop gate |
 | `audit.py` / `cost.py` | Redacted events, token totals, and optional cost estimates |
 | `cli.py` | `validate` and single-task `run` entry points |
 
-Both external systems are ports. Tests inject mock Responses clients and a mock GitHub adapter, so
+Model providers and repository storage are ports. Tests inject mock Responses clients and a mock
+repository adapter, so
 integration tests neither call OpenAI nor touch a real repository.
 
 ## Configuration
 
 Copy `config/orchestrator.example.yml` outside source control if it contains environment-specific
-values. Model IDs, reasoning effort, provider base URL, verification commands, required CI checks,
+values. Model IDs, reasoning effort, provider base URL, verification commands, optional remote checks,
 path policy, and pricing are configurable. API keys are read only from the configured environment
 variable. The example contains no credential.
 
-Set `required_ci_checks` to the exact GitHub check names used by the target repository. The example
-uses this repository's `quality` job; a missing, pending, skipped, or failed required check blocks
-`MERGE_READY`.
+For local mode, omit `github` entirely. If GitHub publication is enabled, set
+`github.required_checks` to the exact remote check names. A missing, pending, skipped, or failed
+required remote check blocks `INTEGRATION_READY`.
 
-Only verification commands present in `github.verification_commands` may enter a generated Task
+Only verification commands present in `repository.verification_commands` may enter a generated Task
 Contract. Each command is an argument vector and is executed without a shell.
 
 ## CLI
@@ -93,8 +96,9 @@ OPENAI_API_KEY=... uv run codex-auto run \
   --repo-path /path/to/target-checkout
 ```
 
-The checkout must be clean and its configured remote must match `github.repository`. The command
-returns exit code `0` only at `MERGE_READY`; bounded or unexpected failures return a structured
+The checkout must be clean and its local base branch must exist. A remote identity is checked only
+when optional GitHub publication is configured. The command returns exit code `0` only at
+`INTEGRATION_READY`; bounded or unexpected failures return a structured
 `BLOCKED` result and exit code `2`.
 
 For repository-local installation and automatic discovery inside one ChatGPT/Codex local project,
@@ -106,7 +110,7 @@ see [`PROJECT_LOCAL_INSTALLATION.md`](PROJECT_LOCAL_INSTALLATION.md).
   cancellation, or multi-worker concurrency control.
 - Patch generation sends selected repository text to the model and is bounded by
   `context_max_bytes`; large repositories need retrieval/context-selection extensions.
-- The GitHub adapter requires installed/authenticated `git` and `gh`; GitHub App authentication and
+- Local mode requires only `git`. Optional GitHub mode also requires authenticated `gh`; GitHub App authentication and
   direct REST/webhook adapters are not included.
 - It applies text unified diffs only. Binary files, symlinks, and deletions are rejected by default.
 - Model/API retries and idempotency keys are not yet implemented. A rerun may require operator

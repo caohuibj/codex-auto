@@ -9,7 +9,7 @@ from codex_auto.models import ReviewDecision, TaskState
 from .helpers import (
     HEAD_ONE,
     HEAD_TWO,
-    MockGitHubAdapter,
+    MockRepositoryAdapter,
     make_app_config,
     make_plan,
     make_request,
@@ -18,35 +18,36 @@ from .helpers import (
 
 
 def make_workflow(tmp_path, *, max_fix_cycles: int = 2):
-    github = MockGitHubAdapter()
+    repository = MockRepositoryAdapter()
     store = AppSessionStore(tmp_path / "session.json")
     audit = JsonlAuditLog(tmp_path / "audit.jsonl", "TASK-001")
-    workflow = ChatGPTAppWorkflow(make_app_config(max_fix_cycles), github, store, audit)
-    return workflow, github, store
+    workflow = ChatGPTAppWorkflow(make_app_config(max_fix_cycles), repository, store, audit)
+    return workflow, repository, store
 
 
 def test_app_native_happy_path_uses_no_model_client_and_stops_for_human(tmp_path):
-    workflow, github, store = make_workflow(tmp_path)
+    workflow, repository, store = make_workflow(tmp_path)
 
     assert workflow.start(make_request()).state == TaskState.PLANNING
     assert workflow.accept_plan(make_plan()).state == TaskState.PLANNED
     implementation = workflow.begin_implementation()
     assert implementation.state == TaskState.IMPLEMENTING
     assert implementation.feature_branch == "codex-auto/task-001"
-    assert workflow.record_pull_request(7).state == TaskState.PR_OPEN
+    assert workflow.record_change().state == TaskState.CHANGE_READY
     assert workflow.begin_review().state == TaskState.REVIEWING
     session = workflow.submit_review(make_review(ReviewDecision.APPROVED, HEAD_ONE))
     result = workflow.result(session)
 
-    assert result.state == TaskState.MERGE_READY
+    assert result.state == TaskState.INTEGRATION_READY
+    assert result.change_url is None
     assert result.human_action_required is not None
     assert result.usage == []
     assert result.estimated_cost_usd is None
-    assert "merge" not in github.calls
-    assert store.load().state == TaskState.MERGE_READY
+    assert "merge" not in repository.calls
+    assert store.load().state == TaskState.INTEGRATION_READY
     events = (tmp_path / "audit.jsonl").read_text(encoding="utf-8")
     assert "accounting.unavailable" in events
-    assert "human_merge_gate.reached" in events
+    assert "human_integration_gate.reached" in events
 
 
 def test_app_native_bounded_fix_then_review(tmp_path):
@@ -54,16 +55,16 @@ def test_app_native_bounded_fix_then_review(tmp_path):
     workflow.start(make_request())
     workflow.accept_plan(make_plan())
     workflow.begin_implementation()
-    workflow.record_pull_request(7)
+    workflow.record_change()
     workflow.begin_review()
     changed = workflow.submit_review(make_review(ReviewDecision.CHANGES_REQUESTED, HEAD_ONE))
     assert changed.state == TaskState.CHANGES_REQUESTED
     assert workflow.begin_fix().state == TaskState.FIXING
     github.commit_count = 2
-    assert workflow.record_fix(7).state == TaskState.REVIEWING
+    assert workflow.record_fix().state == TaskState.REVIEWING
     approved = workflow.submit_review(make_review(ReviewDecision.APPROVED, HEAD_TWO))
 
-    assert approved.state == TaskState.MERGE_READY
+    assert approved.state == TaskState.INTEGRATION_READY
     assert approved.fix_cycles == 1
 
 
@@ -72,7 +73,7 @@ def test_app_native_fix_limit_is_terminal(tmp_path):
     workflow.start(make_request())
     workflow.accept_plan(make_plan())
     workflow.begin_implementation()
-    workflow.record_pull_request(7)
+    workflow.record_change()
     workflow.begin_review()
     workflow.submit_review(make_review(ReviewDecision.CHANGES_REQUESTED, HEAD_ONE))
 

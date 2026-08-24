@@ -21,11 +21,11 @@ Every command needs `--config "$CONFIG" --repo-path . --session "$SESSION"`. Add
 app-start --task "$TASK"
 app-accept-plan --plan "$PLAN"
 app-begin-implementation
-app-record-pr --pr-number <number>
+app-record-change
 app-begin-review
 app-submit-review --review "$REVIEW"
 app-begin-fix
-app-record-fix --pr-number <number>
+app-record-fix
 app-status
 ```
 
@@ -52,15 +52,15 @@ ReviewResult fields (copy task/base/head identifiers from the latest packet):
 decision: APPROVED # or CHANGES_REQUESTED or BLOCKED
 task_id: TASK-001
 base_sha: <40-character contract base SHA>
-head_sha: <40-character current PR head SHA>
+head_sha: <40-character current change head SHA>
 criteria:
   - criterion_id: AC-01
     status: PASS # FAIL or UNVERIFIED when not approved
-    evidence: Evidence from the actual PR diff/checks.
+    evidence: Evidence from the actual local diff/checks.
 findings: []
-merge_recommendation: A precise human-facing recommendation.
+integration_recommendation: A precise human-facing recommendation.
 ```
 
 Each blocking finding uses: `id`, `severity: blocking`, optional `criterion_id`, `location`, `issue`,
 `evidence`, `required_change`, and `acceptance_condition`. `APPROVED` cannot contain blocking findings
-or non-PASS criteria and cannot bypass failed local/CI evidence.
+or non-PASS criteria and cannot bypass failed local evidence or configured remote evidence.

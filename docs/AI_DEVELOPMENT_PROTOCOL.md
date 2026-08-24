@@ -2,40 +2,43 @@
 
 ## Purpose
 
-`codex-auto` defines a reusable, project-agnostic engineering governance protocol for AI-assisted software development. It separates planning and judgment from implementation and uses GitHub as the durable source of truth.
+`codex-auto` defines a reusable, project-agnostic engineering governance protocol for AI-assisted
+software development. It separates planning and judgment from implementation and uses local Git
+commits plus recorded evidence as the default durable source of truth. GitHub is optional.
 
 ## Roles
 
 ### Product Owner (Human)
 - Defines product goals, priorities, constraints, and final acceptance.
-- Retains merge authority unless a project explicitly adopts a different policy.
+- Retains integration authority unless a project explicitly adopts a different policy.
 - Resolves product ambiguities that cannot be derived from repository evidence.
 
 ### Lead / Reviewer Agent (default: Sol High)
 - Reads the target repository before planning.
 - Performs architecture and impact analysis.
 - Produces a bounded Task Contract.
-- Reviews the actual PR diff, repository state, tests, and CI evidence.
+- Reviews the actual local diff, repository state, tests, and optional remote evidence.
 - Must not treat implementer summaries as evidence.
 - Does not perform routine implementation unless a task is explicitly reassigned.
 
 ### Implementer Agent (default: Luna Max)
 - Executes only the bounded Task Contract.
-- Creates a feature branch, implements, tests, commits, pushes, and opens/updates a PR.
+- Creates a local feature branch, implements, tests, and commits. Publishes only when configured.
 - Does not redefine architecture or expand scope without escalation.
 - If the contract is insufficient or conflicts with repository reality, returns `BLOCKED` with evidence and a proposed resolution.
 
 ## Source of Truth
 
-GitHub is the coordination layer. Durable state must be represented by repository artifacts whenever practical:
+The local Git worktree is the required coordination layer. Durable state must be represented by
+repository/runtime artifacts whenever practical:
 
 1. base branch and base SHA;
 2. Task Contract / issue;
 3. feature branch;
 4. commits;
-5. pull request;
-6. CI/test evidence;
-7. review decision.
+5. change evidence bound to base/head SHAs;
+6. local verification and optional remote evidence;
+7. review decision and human integration status.
 
 Conversation memory, model summaries, and unstored assumptions are not authoritative project state.
 
@@ -45,9 +48,9 @@ Conversation memory, model summaries, and unstored assumptions are not authorita
 REQUESTED
   -> PLANNED
   -> IMPLEMENTING
-  -> PR_OPEN
+  -> CHANGE_READY
   -> REVIEWING
-       -> APPROVED -> MERGE_READY -> HUMAN_MERGE
+       -> APPROVED -> INTEGRATION_READY -> HUMAN_INTEGRATION
        -> CHANGES_REQUESTED -> IMPLEMENTING
        -> BLOCKED -> ESCALATION -> PLANNED/IMPLEMENTING
 ```

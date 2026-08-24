@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from codex_auto.config import AppConfig
 from codex_auto.models import (
+    ChangeEvidence,
     PlanProposal,
-    PullRequestEvidence,
     ReviewDecision,
     ReviewResult,
     TaskContract,
@@ -22,21 +22,21 @@ class EvidenceGateViolation(ValueError):
     pass
 
 
-def validate_pull_request_identity(
+def validate_change_identity(
     contract: TaskContract,
-    evidence: PullRequestEvidence,
+    evidence: ChangeEvidence,
     expected_head_branch: str,
 ) -> None:
     errors: list[str] = []
     if evidence.base_branch != contract.base_branch:
         errors.append(
-            f"PR base branch {evidence.base_branch!r} != contract {contract.base_branch!r}"
+            f"change base branch {evidence.base_branch!r} != contract {contract.base_branch!r}"
         )
     if evidence.base_sha != contract.base_sha:
-        errors.append(f"PR merge base {evidence.base_sha} != contract base {contract.base_sha}")
+        errors.append(f"change merge base {evidence.base_sha} != contract base {contract.base_sha}")
     if evidence.head_branch != expected_head_branch:
         errors.append(
-            f"PR head branch {evidence.head_branch!r} != task branch {expected_head_branch!r}"
+            f"change head branch {evidence.head_branch!r} != task branch {expected_head_branch!r}"
         )
     if errors:
         raise EvidenceGateViolation("; ".join(errors))
@@ -59,7 +59,7 @@ def build_contract(
     if missing_out_scope:
         raise ContractViolation(f"plan dropped human out-of-scope items: {missing_out_scope}")
 
-    known_verification = set(config.github.verification_commands)
+    known_verification = set(config.repository.verification_commands)
     unknown = sorted(set(plan.verification) - known_verification)
     if unknown:
         raise ContractViolation(f"plan requested unconfigured verification checks: {unknown}")
@@ -81,14 +81,14 @@ def build_contract(
 
 def validate_evidence(
     contract: TaskContract,
-    evidence: PullRequestEvidence,
+    evidence: ChangeEvidence,
     config: AppConfig,
     expected_head_branch: str,
 ) -> None:
-    validate_pull_request_identity(contract, evidence, expected_head_branch)
+    validate_change_identity(contract, evidence, expected_head_branch)
     errors: list[str] = []
     if not evidence.diff.strip():
-        errors.append("PR diff is empty")
+        errors.append("change diff is empty")
 
     verification_by_name = {result.name: result for result in evidence.local_verification}
     for name in contract.verification:
@@ -98,9 +98,12 @@ def validate_evidence(
         elif result.status != VerificationStatus.PASS:
             errors.append(f"required verification {name!r} is {result.status.value}")
 
-    checks_by_name = {check.name: check for check in evidence.checks}
+    checks_by_name = {
+        check.name: check for check in ([] if evidence.remote is None else evidence.remote.checks)
+    }
     successful = {"success", "successful"}
-    for name in config.github.required_ci_checks:
+    required_checks = [] if config.github is None else config.github.required_checks
+    for name in required_checks:
         check = checks_by_name.get(name)
         if check is None:
             errors.append(f"required CI check {name!r} is missing")
@@ -113,16 +116,14 @@ def validate_evidence(
         raise EvidenceGateViolation("; ".join(errors))
 
 
-def validate_review(
-    contract: TaskContract, evidence: PullRequestEvidence, review: ReviewResult
-) -> None:
+def validate_review(contract: TaskContract, evidence: ChangeEvidence, review: ReviewResult) -> None:
     errors: list[str] = []
     if review.task_id != contract.task_id:
         errors.append("review task ID does not match contract")
     if review.base_sha != contract.base_sha:
         errors.append("review base SHA does not match contract")
     if review.head_sha != evidence.head_sha:
-        errors.append("review head SHA does not match current PR evidence")
+        errors.append("review head SHA does not match current change evidence")
 
     expected_ids = {criterion.id for criterion in contract.acceptance_criteria}
     actual_ids = {assessment.criterion_id for assessment in review.criteria}
